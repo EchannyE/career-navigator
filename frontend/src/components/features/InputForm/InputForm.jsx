@@ -1,42 +1,61 @@
-import Card from '../../ui/Card'
-import Button from '../../ui/Button'
-import ResumeInput from './ResumeInput'
-import JobInput from './JobInput'
 
-export default function InputForm({ error, form, onChange, onSubmit }) {
-  return (
-    <div className="grid-two fade-up" style={{ padding: '28px 24px 24px' }}>
-      <Card>
-        <div className="stack-lg">
-          <div className="stack-sm">
-            <p className="eyebrow">Career Fit Analysis</p>
-            <h2 className="section-title">Turn your resume into an interview plan.</h2>
-            <p className="section-copy">
-              Paste your resume, add a target job, and generate a structured gap analysis with concrete next steps.
-            </p>
-          </div>
-          <ResumeInput value={form.resumeText} onChange={(value) => onChange('resumeText', value)} />
-        </div>
-      </Card>
+import ResumeInput from "./ResumeInput.jsx";
+import JobInput    from "./JobInput.jsx";
+import Button      from "../../ui/Button.jsx";
+import Tag         from "../../ui/Tag.jsx";
 
-      <Card>
-        <div className="stack-lg">
-          <JobInput
-            jobUrl={form.jobUrl}
-            jobDescription={form.jobDescription}
-            onChange={onChange}
-          />
-          {error ? (
-            <p style={{ margin: 0, color: 'var(--danger)', fontWeight: 600 }}>{error}</p>
-          ) : null}
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-            <p className="muted" style={{ margin: 0, maxWidth: '34ch' }}>
-              If no backend is configured, the app generates a local fallback report so the workflow still works.
-            </p>
-            <Button onClick={onSubmit}>Analyze fit</Button>
-          </div>
-        </div>
-      </Card>
+const InputForm = ({
+  resume, onResumeChange,
+  jobUrl, onUrlChange,
+  jobPaste, onPasteChange,
+  inputMode, onModeChange,
+  onAnalyze, error, onClearError,
+}) => (
+  <main className="flex-1 overflow-y-auto px-12 py-11 bg-gradient-to-b from-blue-50/60 to-transparent dark:from-blue-950/20 dark:to-transparent">
+
+    {/* Hero */}
+    <div className="max-w-xl mb-10 animate-fade-up">
+      <div className="mb-5">
+        <Tag color="#2563eb">AI-Powered Gap Analysis · 3MTT Cohort 2</Tag>
+      </div>
+
+      <h1 className="font-display text-4xl font-extrabold tracking-tight leading-[1.15] text-slate-900 dark:text-slate-50 mb-4">
+        Find out how well your resume{" "}
+        <span className="text-gradient">matches a job</span>
+      </h1>
+
+      <p className="text-[15px] leading-relaxed text-slate-500 dark:text-slate-400">
+        Paste your resume and a job URL. Our AI analyzes your skill gaps, scores
+        your match, and builds a personalised learning roadmap in under a minute.
+      </p>
     </div>
-  )
-}
+
+    {/* Error alert */}
+    {error && (
+      <div className="flex items-center justify-between mb-5 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-400 animate-fade-in">
+        <span>⚠ {error}</span>
+        <button onClick={onClearError} className="ml-3 text-red-400 hover:text-red-600 dark:hover:text-red-300 text-base leading-none">✕</button>
+      </div>
+    )}
+
+    {/* Two-column form */}
+    <div className="grid grid-cols-2 gap-5 mb-7 animate-fade-up delay-2">
+      <ResumeInput value={resume} onChange={onResumeChange} />
+      <JobInput
+        inputMode={inputMode} onModeChange={onModeChange}
+        jobUrl={jobUrl} onUrlChange={onUrlChange}
+        jobPaste={jobPaste} onPasteChange={onPasteChange}
+      />
+    </div>
+
+    {/* CTA */}
+    <div className="flex items-center gap-4 animate-fade-up delay-3">
+      <Button onClick={onAnalyze}>⚡ Analyze My Fit</Button>
+      <span className="text-sm text-slate-400 dark:text-slate-500">
+        ~30–60 seconds · 3 AI chains · Powered by Claude
+      </span>
+    </div>
+  </main>
+);
+
+export default InputForm;
