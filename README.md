@@ -400,17 +400,4 @@ MIT License — see [LICENSE](./LICENSE) for details.
 
 ---
 
-## Acknowledgements
 
-- [3MTT Nigeria](https://3mtt.nitda.gov.ng) — for the mentorship programme framework
-- [Saviour Henry](https://github.com/saviour-henry) — Team Alpha mentor
-- [Google AI Studio](https://aistudio.google.com) — Gemini 2.0 Flash API
-- [n8n](https://n8n.io) — workflow automation platform
-- [Anthropic Claude](https://anthropic.com) — development assistance
-
----
-
-<div align="center">
-  <strong>Career Coach Navigator</strong> · Built for 3MTT Cohort 2 · Generative AI Track<br/>
-  Made with ⚡ by Team Alpha
-</div>
