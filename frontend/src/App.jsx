@@ -1,50 +1,61 @@
-import Layout from './components/layout/Layout'
-import Header from './components/layout/Header'
-import InputForm from './components/features/InputForm/InputForm'
-import ProcessingView from './components/features/Processing/ProcessingView'
-import ResultsDashboard from './components/features/Results/ResultsDashboard'
-import { SCREENS } from './constants'
-import { useAnalysis } from './hooks/useAnalysis'
-import { useDarkMode } from './hooks/useDarkMode'
 
-function App() {
-  const { isDarkMode, toggleTheme } = useDarkMode()
+import Layout           from "./components/layout/Layout.jsx";
+import Header           from "./components/layout/Header.jsx";
+import InputForm        from "./components/features/InputForm/InputForm.jsx";
+import ProcessingView   from "./components/features/Processing/ProcessingView.jsx";
+import ResultsDashboard from "./components/features/Results/ResultsDashboard.jsx";
+import Button           from "./components/ui/Button.jsx";
+
+import useDarkMode  from "./hooks/useDarkMode.js";
+import useAnalysis  from "./hooks/useAnalysis.js";
+import { SCREENS }  from "./constants/index.js";
+import { downloadReport } from "./utils/downloadReport.js";
+
+const App = () => {
+  const { isDark, toggleDark } = useDarkMode();
   const {
-    activeStep,
-    activeTab,
-    error,
-    form,
-    rawReport,
-    report,
-    screen,
-    statusMessage,
-    updateField,
-    resetAnalysis,
-    runAnalysis,
-    setActiveTab,
-  } = useAnalysis()
+    resume, setResume,
+    jobUrl, setJobUrl,
+    jobPaste, setJobPaste,
+    inputMode, setInputMode,
+    screen, stepStatus, report,
+    error, setError,
+    analyze, reset,
+  } = useAnalysis();
+
+  const resultsSlot = screen === SCREENS.RESULTS && report ? (
+    <>
+      <Button variant="ghost" onClick={() => downloadReport(report.fullReport)} className="text-xs py-2 px-3.5">
+        ⬇ Download
+      </Button>
+      <Button variant="ghost" onClick={reset} className="text-xs py-2 px-3.5">
+        ↩ New Analysis
+      </Button>
+    </>
+  ) : null;
 
   return (
     <Layout>
-      <Header isDarkMode={isDarkMode} onToggleTheme={toggleTheme} />
-      {screen === SCREENS.INPUT ? (
-        <InputForm error={error} form={form} onChange={updateField} onSubmit={runAnalysis} />
-      ) : null}
-      {screen === SCREENS.PROCESSING ? (
-        <ProcessingView activeStep={activeStep} statusMessage={statusMessage} />
-      ) : null}
-      {screen === SCREENS.RESULTS ? (
-        <ResultsDashboard
-          activeTab={activeTab}
-          form={form}
-          onChangeTab={setActiveTab}
-          onReset={resetAnalysis}
-          rawReport={rawReport}
-          report={report}
-        />
-      ) : null}
-    </Layout>
-  )
-}
+      <Header isDark={isDark} toggleDark={toggleDark} rightSlot={resultsSlot} />
 
-export default App
+      {screen === SCREENS.INPUT && (
+        <InputForm
+          resume={resume}         onResumeChange={setResume}
+          jobUrl={jobUrl}         onUrlChange={setJobUrl}
+          jobPaste={jobPaste}     onPasteChange={setJobPaste}
+          inputMode={inputMode}   onModeChange={setInputMode}
+          onAnalyze={analyze}
+          error={error}           onClearError={() => setError(null)}
+        />
+      )}
+
+      {screen === SCREENS.PROCESSING && <ProcessingView stepStatus={stepStatus} />}
+
+      {screen === SCREENS.RESULTS && report && (
+        <ResultsDashboard report={report} onReset={reset} />
+      )}
+    </Layout>
+  );
+};
+
+export default App;
