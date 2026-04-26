@@ -1,192 +1,224 @@
-import { useMemo, useState } from 'react'
-import { callClaude, callN8nWebhook, fetchJobPage } from '../api/coachApi'
-import { DEFAULT_REPORT, PROCESSING_STEPS, RESULT_TABS, SCREENS } from '../constants'
-import { parseReport } from '../utils/reportParser'
 
-const wait = (duration) => new Promise((resolve) => setTimeout(resolve, duration))
 
-const buildMockReport = ({ resumeText, jobDescription, jobUrl }) => {
-  const sourceText = `${resumeText} ${jobDescription}`.toLowerCase()
-  const keywordUniverse = ['react', 'leadership', 'sql', 'product', 'analytics', 'python', 'stakeholder']
-  const keywords = keywordUniverse.filter((keyword) => sourceText.includes(keyword))
-  const scoreBase = 48 + Math.min(42, keywords.length * 8) + Math.min(10, Math.floor(resumeText.length / 350))
-  const matchScore = Math.min(96, scoreBase)
+import { useState, useCallback } from "react";
+import { callClaude, fetchJobPage } from "../api/coachApi.js";
+import { buildReport } from "../utils/reportParser.js";
+import { SCREENS, STEP_STATUS } from "../constants/index.js";
 
-  return {
-    roleSummary: jobDescription
-      ? 'Your resume shows relevant signal for this role, but the strongest case will come from sharper evidence against the posted requirements.'
-      : 'Your resume has usable material, but the match is being estimated without a pasted job description.',
-    matchScore,
-    strengths: [
-      'Resume contains concrete execution language instead of vague responsibilities.',
-      'Experience suggests transferable delivery skills that can be reframed for adjacent roles.',
-      keywords.length > 0
-        ? `Relevant keywords already present: ${keywords.join(', ')}.`
-        : 'Your current draft needs more explicit role-specific keyword coverage.',
-    ],
-    gaps: [
-      'Bullet points need more quantified outcomes tied to business impact.',
-      'Role fit would be stronger with direct language mirroring the target job description.',
-      jobUrl ? `The job link ${jobUrl} should be cross-checked against the live posting before applying.` : 'Add the live job posting URL for a tighter comparison.',
-    ],
-    actionPlan: [
-      'Rewrite the top third of the resume around the role title and 3 high-value skills.',
-      'Replace generic bullets with metrics, scope, and decision ownership.',
-      'Prepare two interview stories that prove execution under ambiguity.',
-    ],
-    keywords: keywords.length > 0 ? keywords : ['ownership', 'results', 'cross-functional'],
-    interviewFocus: [
-      'Explain one project where you improved an outcome that leadership cared about.',
-      'Be ready to describe tradeoffs, constraints, and how you prioritized next steps.',
-    ],
-    fullReport: JSON.stringify(
-      {
-        note: 'Generated fallback report because no backend endpoint is configured.',
-        jobDescription,
-        resumeLength: resumeText.length,
-        matchScore,
-      },
-      null,
-      2,
-    ),
-  }
-}
+// ─── Initial state factories ──────────────────────────────────────────────────
+const makeStepStatus = () => ({
+  fetch:  STEP_STATUS.IDLE,
+  chain1: STEP_STATUS.IDLE,
+  chain2: STEP_STATUS.IDLE,
+  chain3: STEP_STATUS.IDLE,
+});
 
-const extractResponseText = (response) => {
-  if (typeof response === 'string') {
-    return response
-  }
+// ─── Prompt builders ──────────────────────────────────────────────────────────
+const buildChain1Prompt = (rawContent) =>
+  `You are a precise web content extractor.
 
-  if (response?.content?.[0]?.text) {
-    return response.content[0].text
-  }
+Extract ONLY this structured information:
+1. JOB TITLE: The exact role title
+2. COMPANY NAME: The company name
+3. JOB DESCRIPTION: Full cleaned text — responsibilities, requirements, preferred qualifications, tools/technologies.
 
-  if (response?.text) {
-    return response.text
-  }
+Remove ALL HTML tags, navigation, cookie notices, ads, footers.
+If content is empty or behind a login wall, respond ONLY with:
+"PAGE_ERROR: The job page could not be retrieved. Please paste the job description directly."
 
-  if (response?.output) {
-    return typeof response.output === 'string' ? response.output : JSON.stringify(response.output, null, 2)
-  }
+Return only the 3 structured fields. No commentary.
 
-  return JSON.stringify(response, null, 2)
-}
+RAW CONTENT:
+${rawContent || "NO CONTENT RETRIEVED"}`;
 
-export function useAnalysis() {
-  const [form, setForm] = useState({
-    resumeText: '',
-    jobUrl: '',
-    jobDescription: '',
-  })
-  const [screen, setScreen] = useState(SCREENS.INPUT)
-  const [activeStep, setActiveStep] = useState(0)
-  const [activeTab, setActiveTab] = useState(RESULT_TABS[0].id)
-  const [rawReport, setRawReport] = useState('')
-  const [report, setReport] = useState(DEFAULT_REPORT)
-  const [error, setError] = useState('')
-  const [statusMessage, setStatusMessage] = useState('')
+const buildChain2Prompt = (resume, jobDescription) =>
+  `You are an expert Career Coach and Technical Recruiter with 15 years of experience.
 
-  const scoreBand = useMemo(
-    () => report.matchScore,
-    [report.matchScore],
-  )
+Perform a thorough, honest gap analysis. Return in EXACTLY this format:
 
-  const updateField = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }))
-  }
+MATCH SCORE: [0-100]%
 
-  const resetAnalysis = () => {
-    setScreen(SCREENS.INPUT)
-    setActiveStep(0)
-    setActiveTab(RESULT_TABS[0].id)
-    setRawReport('')
-    setReport(DEFAULT_REPORT)
-    setError('')
-    setStatusMessage('')
-  }
+MATCHED SKILLS:
+- [Each matching skill or qualification]
 
-  const runAnalysis = async () => {
-    if (!form.resumeText.trim()) {
-      setError('Paste your resume before starting the analysis.')
-      return
-    }
+SKILL GAPS:
+- [Each required skill the candidate is missing]
 
-    setError('')
-    setScreen(SCREENS.PROCESSING)
-    setActiveStep(0)
-    setStatusMessage(PROCESSING_STEPS[0])
+EXPERIENCE GAPS:
+- [Experience level or domain gaps]
+
+MISSING KEYWORDS:
+- [Specific technical keywords from the job not in the resume]
+
+OVERALL ASSESSMENT:
+[2-3 honest, constructive sentences about candidate fit]
+
+---
+
+CANDIDATE RESUME:
+${resume}
+
+JOB DESCRIPTION:
+${jobDescription}`;
+
+const buildChain3Prompt = (gapAnalysis) =>
+  `You are an expert Career Coach creating actionable learning plans.
+
+Generate a clear, motivating learning plan in EXACTLY this format:
+
+ACTION PLAN - PRIORITY SKILLS TO LEARN:
+
+HIGH PRIORITY (Learn these first):
+1. [Skill name]
+   - Why it matters: [1 sentence]
+   - How to learn it: [Specific free resource]
+   - Estimated time: [e.g., 2 weeks]
+
+MEDIUM PRIORITY (Important but not blocking):
+1. [Skill name]
+   - Why it matters: [1 sentence]
+   - How to learn it: [Specific resource]
+   - Estimated time: [timeframe]
+
+QUICK WINS (Add to your resume this week):
+- [Things the candidate can add quickly]
+
+RESUME IMPROVEMENT TIPS:
+- [2-3 specific tips for this exact role]
+
+ENCOURAGEMENT:
+[1-2 sentences of genuine encouragement based on candidate strengths]
+
+---
+
+GAP ANALYSIS:
+${gapAnalysis}`;
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+const useAnalysis = () => {
+  // ── Form inputs ────────────────────────────────────────────────────────────
+  const [resume,    setResume]    = useState("");
+  const [jobUrl,    setJobUrl]    = useState("");
+  const [jobPaste,  setJobPaste]  = useState("");
+  const [inputMode, setInputMode] = useState("url"); // "url" | "paste"
+
+  // ── App state ──────────────────────────────────────────────────────────────
+  const [screen,     setScreen]     = useState(SCREENS.INPUT);
+  const [stepStatus, setStepStatus] = useState(makeStepStatus());
+  const [report,     setReport]     = useState(null);
+  const [error,      setError]      = useState(null);
+
+  // ── Step status helper ─────────────────────────────────────────────────────
+  const setStep = useCallback((key, status) => {
+    setStepStatus((prev) => ({ ...prev, [key]: status }));
+  }, []);
+
+  // ── Validation ─────────────────────────────────────────────────────────────
+  const validate = useCallback(() => {
+    if (!resume.trim())                                return "Resume is required.";
+    if (inputMode === "url" && !jobUrl.trim())         return "Please enter a job URL.";
+    if (inputMode === "paste" && !jobPaste.trim())     return "Please paste the job description.";
+    return null;
+  }, [resume, jobUrl, jobPaste, inputMode]);
+
+  // ── Main pipeline orchestrator ─────────────────────────────────────────────
+  const analyze = useCallback(async () => {
+    const validationError = validate();
+    if (validationError) { setError(validationError); return; }
+
+    setError(null);
+    setReport(null);
+    setStepStatus(makeStepStatus());
+    setScreen(SCREENS.PROCESSING);
 
     try {
-      let enrichedJobDescription = form.jobDescription.trim()
-
-      if (form.jobUrl.trim() && !enrichedJobDescription) {
-        const jobPage = await fetchJobPage(form.jobUrl.trim())
-        if (jobPage.content) {
-          enrichedJobDescription = jobPage.content
-        }
+      // ── Step: Fetch job page HTML ────────────────────────────────────────
+      setStep("fetch", STEP_STATUS.RUNNING);
+      let rawContent = "";
+      if (inputMode === "url") {
+        rawContent = await fetchJobPage(jobUrl);
+      } else {
+        rawContent = jobPaste;
+        await new Promise((r) => setTimeout(r, 500)); // UX: brief pause for paste mode
       }
+      setStep("fetch", STEP_STATUS.DONE);
 
-      for (let index = 0; index < PROCESSING_STEPS.length; index += 1) {
-        setActiveStep(index)
-        setStatusMessage(PROCESSING_STEPS[index])
-        await wait(350)
+      // ── Chain 1: Extract job info ────────────────────────────────────────
+      setStep("chain1", STEP_STATUS.RUNNING);
+      let chain1 = await callClaude(
+        "You are a precise web content extractor.",
+        buildChain1Prompt(rawContent),
+        1024
+      );
+
+      // If scrape failed and user also provided paste text, retry with paste
+      if (chain1.includes("PAGE_ERROR") && jobPaste.trim()) {
+        chain1 = await callClaude(
+          "You are a precise web content extractor.",
+          buildChain1Prompt(jobPaste),
+          1024
+        );
       }
+      setStep("chain1", STEP_STATUS.DONE);
 
-      const promptPayload = {
-        resumeText: form.resumeText.trim(),
-        jobUrl: form.jobUrl.trim(),
-        jobDescription: enrichedJobDescription,
-        instructions:
-          'Return JSON with roleSummary, matchScore, strengths, gaps, actionPlan, keywords, interviewFocus, and fullReport.',
-      }
+      // ── Chain 2: Gap analysis ────────────────────────────────────────────
+      setStep("chain2", STEP_STATUS.RUNNING);
+      const chain2 = await callClaude(
+        "You are an expert Career Coach and Technical Recruiter.",
+        buildChain2Prompt(resume, chain1),
+        1500
+      );
+      setStep("chain2", STEP_STATUS.DONE);
 
-      let responseText = ''
+      // ── Chain 3: Action plan ─────────────────────────────────────────────
+      setStep("chain3", STEP_STATUS.RUNNING);
+      const chain3 = await callClaude(
+        "You are an expert Career Coach creating actionable learning plans.",
+        buildChain3Prompt(chain2),
+        2000
+      );
+      setStep("chain3", STEP_STATUS.DONE);
 
-      try {
-        if (import.meta.env.VITE_N8N_WEBHOOK_URL) {
-          responseText = extractResponseText(await callN8nWebhook(promptPayload))
-        } else if (import.meta.env.VITE_CLAUDE_API_URL) {
-          responseText = extractResponseText(await callClaude(promptPayload))
-        } else {
-          responseText = JSON.stringify(buildMockReport({ ...form, jobDescription: enrichedJobDescription }), null, 2)
-        }
-      } catch (apiError) {
-        responseText = JSON.stringify(
-          {
-            ...buildMockReport({ ...form, jobDescription: enrichedJobDescription }),
-            fullReport: `${apiError.message}\n\nFallback report generated locally.`,
-          },
-          null,
-          2,
-        )
-      }
+      // ── Assemble report ──────────────────────────────────────────────────
+      const finalReport = buildReport({
+        resume,
+        jobUrl: inputMode === "url" ? jobUrl : "Manual Input",
+        chain1,
+        chain2,
+        chain3,
+      });
 
-      const parsed = parseReport(responseText)
-
-      setForm((current) => ({ ...current, jobDescription: enrichedJobDescription }))
-      setRawReport(responseText)
-      setReport(parsed)
-      setActiveTab(RESULT_TABS[0].id)
-      setScreen(SCREENS.RESULTS)
-    } catch (runError) {
-      setError(runError.message || 'Analysis failed. Please try again.')
-      setScreen(SCREENS.INPUT)
+      setReport(finalReport);
+      setScreen(SCREENS.RESULTS);
+    } catch (err) {
+      setError(`Analysis failed: ${err.message}`);
+      setScreen(SCREENS.INPUT);
     }
-  }
+  }, [validate, inputMode, jobUrl, jobPaste, resume, setStep]);
+
+  // ── Reset everything to initial state ─────────────────────────────────────
+  const reset = useCallback(() => {
+    setScreen(SCREENS.INPUT);
+    setReport(null);
+    setError(null);
+    setStepStatus(makeStepStatus());
+  }, []);
 
   return {
-    activeStep,
-    activeTab,
-    error,
-    form,
-    rawReport,
-    report,
-    scoreBand,
+    // Form inputs
+    resume, setResume,
+    jobUrl, setJobUrl,
+    jobPaste, setJobPaste,
+    inputMode, setInputMode,
+    // App state
     screen,
-    statusMessage,
-    updateField,
-    resetAnalysis,
-    runAnalysis,
-    setActiveTab,
-  }
-}
+    stepStatus,
+    report,
+    error, setError,
+    // Actions
+    analyze,
+    reset,
+  };
+};
+
+export default useAnalysis;
