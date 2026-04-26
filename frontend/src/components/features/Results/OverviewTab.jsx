@@ -1,53 +1,45 @@
-import { SCORE_BANDS } from '../../../constants'
-import BulletList from '../../ui/BulletList'
-import Card from '../../ui/Card'
-import ScoreRing from '../../ui/ScoreRing'
-import SectionLabel from '../../ui/SectionLabel'
-import Tag from '../../ui/Tag'
 
-const getScoreBand = (score) => SCORE_BANDS.find((band) => score >= band.min) || SCORE_BANDS.at(-1)
+import Card         from "../../ui/Card.jsx";
+import SectionLabel from "../../ui/SectionLabel.jsx";
+import BulletList   from "../../ui/BulletList.jsx";
+import Tag          from "../../ui/Tag.jsx";
 
-export default function OverviewTab({ report }) {
-  const scoreBand = getScoreBand(report.matchScore)
+const OverviewTab = ({ parsed }) => {
+  const { matchedSkills, skillGaps, expGaps, missingKw } = parsed;
 
   return (
-    <div className="grid-two" style={{ alignItems: 'start' }}>
-      <Card>
-        <div className="stack-md">
-          <SectionLabel>Match Readout</SectionLabel>
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <ScoreRing score={report.matchScore} />
-            <div className="stack-sm" style={{ flex: 1, minWidth: 220 }}>
-              <Tag tone={scoreBand.tone}>{scoreBand.label}</Tag>
-              <p style={{ margin: 0, lineHeight: 1.6 }}>{scoreBand.description}</p>
-              <p className="muted" style={{ margin: 0, lineHeight: 1.6 }}>
-                {report.roleSummary || 'No high-level summary was returned yet.'}
-              </p>
+    <div className="grid grid-cols-2 gap-4 animate-fade-in">
+
+      {/* Matched skills */}
+      <div className="card p-6 border-emerald-200 dark:border-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-500/[0.04]">
+        <SectionLabel>✓ Matched Skills</SectionLabel>
+        <BulletList items={matchedSkills} color="#10b981" icon="✓" />
+      </div>
+
+      {/* Skill gaps */}
+      <div className="card p-6 border-red-200 dark:border-red-500/20 bg-red-50/40 dark:bg-red-500/[0.04]">
+        <SectionLabel>✗ Skill Gaps</SectionLabel>
+        <BulletList items={skillGaps} color="#ef4444" icon="✗" emptyText="No significant gaps found." />
+      </div>
+
+      {/* Missing keywords */}
+      <div className="card p-6 border-amber-200 dark:border-amber-500/20 bg-amber-50/40 dark:bg-amber-500/[0.04]">
+        <SectionLabel>⚡ Missing Keywords</SectionLabel>
+        {missingKw.length === 0
+          ? <p className="text-sm text-slate-400 italic">No missing keywords detected.</p>
+          : <div className="flex flex-wrap gap-1.5">
+              {missingKw.map((kw, i) => <Tag key={i} color="#d97706">{kw}</Tag>)}
             </div>
-          </div>
-        </div>
-      </Card>
+        }
+      </div>
 
+      {/* Experience gaps */}
       <Card>
-        <div className="stack-md">
-          <SectionLabel>Priority Gaps</SectionLabel>
-          <BulletList items={report.gaps} />
-        </div>
-      </Card>
-
-      <Card>
-        <div className="stack-md">
-          <SectionLabel>Strength Signals</SectionLabel>
-          <BulletList items={report.strengths} />
-        </div>
-      </Card>
-
-      <Card>
-        <div className="stack-md">
-          <SectionLabel>Interview Focus</SectionLabel>
-          <BulletList items={report.interviewFocus} />
-        </div>
+        <SectionLabel>📋 Experience Gaps</SectionLabel>
+        <BulletList items={expGaps} color="#f59e0b" icon="▸" emptyText="No experience gaps found." />
       </Card>
     </div>
-  )
-}
+  );
+};
+
+export default OverviewTab;
