@@ -1,8 +1,5 @@
 # Career Coach Navigator ⚡
 
-> **3MTT Mentorship Programme · Cohort 2 · Generative AI Track**  
-> Mentor: Saviour Henry · Team Alpha · Project P5
-
 An AI-powered career coaching web application that scrapes job listings, compares them against a candidate's resume, and generates a personalised skill gap analysis and learning roadmap using a 3-chain Gemini AI pipeline — all automated through n8n.
 
 ---
