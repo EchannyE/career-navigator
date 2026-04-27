@@ -6,29 +6,37 @@ import ProcessingView   from "./components/features/Processing/ProcessingView.js
 import ResultsDashboard from "./components/features/Results/ResultsDashboard.jsx";
 import Button           from "./components/ui/Button.jsx";
 
-import useDarkMode  from "./hooks/useDarkMode.js";
-import useAnalysis  from "./hooks/useAnalysis.js";
-import { SCREENS }  from "./constants/index.js";
+import useDarkMode        from "./hooks/useDarkMode.js";
+import useAnalysis        from "./hooks/useAnalysis.js";
+import { SCREENS }        from "./constants/index.js";
 import { downloadReport } from "./utils/downloadReport.js";
 
 const App = () => {
   const { isDark, toggleDark } = useDarkMode();
+
   const {
     resume, setResume,
     jobUrl, setJobUrl,
-    jobPaste, setJobPaste,
-    inputMode, setInputMode,
     screen, stepStatus, report,
     error, setError,
     analyze, reset,
   } = useAnalysis();
 
+  // Extra buttons shown in the header on the Results screen
   const resultsSlot = screen === SCREENS.RESULTS && report ? (
     <>
-      <Button variant="ghost" onClick={() => downloadReport(report.fullReport)} className="text-xs py-2 px-3.5">
+      <Button
+        variant="ghost"
+        onClick={() => downloadReport(report.fullReport)}
+        className="text-xs py-2 px-3.5"
+      >
         ⬇ Download
       </Button>
-      <Button variant="ghost" onClick={reset} className="text-xs py-2 px-3.5">
+      <Button
+        variant="ghost"
+        onClick={reset}
+        className="text-xs py-2 px-3.5"
+      >
         ↩ New Analysis
       </Button>
     </>
@@ -40,16 +48,16 @@ const App = () => {
 
       {screen === SCREENS.INPUT && (
         <InputForm
-          resume={resume}         onResumeChange={setResume}
-          jobUrl={jobUrl}         onUrlChange={setJobUrl}
-          jobPaste={jobPaste}     onPasteChange={setJobPaste}
-          inputMode={inputMode}   onModeChange={setInputMode}
+          resume={resume}       onResumeChange={setResume}
+          jobUrl={jobUrl}       onUrlChange={setJobUrl}
           onAnalyze={analyze}
-          error={error}           onClearError={() => setError(null)}
+          error={error}         onClearError={() => setError(null)}
         />
       )}
 
-      {screen === SCREENS.PROCESSING && <ProcessingView stepStatus={stepStatus} />}
+      {screen === SCREENS.PROCESSING && (
+        <ProcessingView stepStatus={stepStatus} />
+      )}
 
       {screen === SCREENS.RESULTS && report && (
         <ResultsDashboard report={report} onReset={reset} />
