@@ -1,40 +1,28 @@
+
 /**
  * hooks/useAnalysis.js
  *
  * Separation of Concerns: ALL business logic for the n8n pipeline lives here.
- *
- * Key design decisions aligned with the n8n Webhook workflow:
- *
- * 1. SINGLE API CALL — frontend sends one POST { resume, jobUrl } to the
- *    n8n Webhook node. n8n runs: HTTP scrape → Chain 1 → Chain 2 → Chain 3 → Sheets.
- *
- * 2. SIMULATED PROGRESS — since n8n is a single async call (black box),
- *    the 4-step progress UI is driven by timed intervals. The final step
- *    (chain3) completes when the real API response arrives.
- *
- * 3. URL ONLY — the n8n HTTP Request node scrapes a URL directly.
- *    Paste mode is not supported by this workflow.
  */
 
-import { useState, useCallback, useRef } from "react";
-import { callN8nWebhook }     from "../api/coachApi.js";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { callN8nWebhook } from "../api/coachApi.js";
 import { buildReportFromN8n } from "../utils/reportParser.js";
 import {
   SCREENS,
   STEP_STATUS,
   STEP_TIMINGS,
+  LIMITS,
 } from "../constants/index.js";
 
-// ─── Initial step state ───────────────────────────────────────────────────────
 const makeStepStatus = () => ({
-  fetch:  STEP_STATUS.IDLE,
+  fetch: STEP_STATUS.IDLE,
   chain1: STEP_STATUS.IDLE,
   chain2: STEP_STATUS.IDLE,
   chain3: STEP_STATUS.IDLE,
 });
 
-// ─── URL validator ────────────────────────────────────────────────────────────
-const isValidUrl = (str) => {
+const isValidUrl = (str = "") => {
   try {
     const { protocol } = new URL(str.trim());
     return protocol === "http:" || protocol === "https:";
@@ -43,95 +31,122 @@ const isValidUrl = (str) => {
   }
 };
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 const useAnalysis = () => {
-  // ── Form inputs ────────────────────────────────────────────────────────
   const [resume, setResume] = useState("");
   const [jobUrl, setJobUrl] = useState("");
 
-  // ── App state ──────────────────────────────────────────────────────────
-  const [screen,     setScreen]     = useState(SCREENS.INPUT);
+  const [screen, setScreen] = useState(SCREENS.INPUT);
   const [stepStatus, setStepStatus] = useState(makeStepStatus());
-  const [report,     setReport]     = useState(null);
-  const [error,      setError]      = useState(null);
+  const [report, setReport] = useState(null);
+  const [error, setError] = useState(null);
 
-  // Timer IDs for simulated progress — cleared on completion or error
   const timersRef = useRef([]);
+  const isMountedRef = useRef(true);
 
-  // ── Helpers ────────────────────────────────────────────────────────────
-  const setStep = useCallback((key, status) => {
-    setStepStatus((prev) => ({ ...prev, [key]: status }));
-  }, []);
-
-  const clearTimers = () => {
+  const clearTimers = useCallback(() => {
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
-  };
+  }, []);
 
-  const scheduleTimer = (delay, fn) => {
-    const id = setTimeout(fn, delay);
+  const scheduleTimer = useCallback((delay, fn) => {
+    const id = setTimeout(() => {
+      if (isMountedRef.current) fn();
+    }, delay);
+
     timersRef.current.push(id);
-  };
+  }, []);
 
-  // ── Validation ─────────────────────────────────────────────────────────
+  const setStep = useCallback((key, status) => {
+    setStepStatus((prev) => ({
+      ...prev,
+      [key]: status,
+    }));
+  }, []);
+
   const validate = useCallback(() => {
-    if (!resume.trim())
+    const cleanResume = resume.trim();
+    const cleanJobUrl = jobUrl.trim();
+
+    if (!cleanResume) {
       return "Please paste your resume before analysing.";
-    if (!jobUrl.trim())
+    }
+
+    if (cleanResume.length < LIMITS.MIN_RESUME_CHARS) {
+      return `Your resume is too short. Please enter at least ${LIMITS.MIN_RESUME_CHARS} characters.`;
+    }
+
+    if (cleanResume.length > LIMITS.MAX_RESUME_CHARS) {
+      return `Your resume is too long. Please keep it under ${LIMITS.MAX_RESUME_CHARS.toLocaleString()} characters.`;
+    }
+
+    if (!cleanJobUrl) {
       return "A job URL is required — the n8n workflow scrapes the page directly.";
-    if (!isValidUrl(jobUrl))
+    }
+
+    if (cleanJobUrl.length > LIMITS.MAX_JOB_URL_LENGTH) {
+      return `The job URL is too long. Please keep it under ${LIMITS.MAX_JOB_URL_LENGTH} characters.`;
+    }
+
+    if (!isValidUrl(cleanJobUrl)) {
       return "Please enter a valid URL starting with http:// or https://";
+    }
+
     return null;
   }, [resume, jobUrl]);
 
-  // ── Simulated progress ─────────────────────────────────────────────────
-  // n8n is one async call so we can't track individual steps in real-time.
-  // We advance the UI on timers that mirror average n8n execution duration.
   const startProgressSimulation = useCallback(() => {
+    clearTimers();
+
     scheduleTimer(STEP_TIMINGS.fetch_start, () => {
       setStep("fetch", STEP_STATUS.RUNNING);
     });
+
     scheduleTimer(STEP_TIMINGS.fetch_done, () => {
-      setStep("fetch",  STEP_STATUS.DONE);
+      setStep("fetch", STEP_STATUS.DONE);
       setStep("chain1", STEP_STATUS.RUNNING);
     });
+
     scheduleTimer(STEP_TIMINGS.chain1_done, () => {
       setStep("chain1", STEP_STATUS.DONE);
       setStep("chain2", STEP_STATUS.RUNNING);
     });
+
     scheduleTimer(STEP_TIMINGS.chain2_done, () => {
       setStep("chain2", STEP_STATUS.DONE);
       setStep("chain3", STEP_STATUS.RUNNING);
     });
-    // chain3 → DONE is set when the real API response arrives (see analyze())
-  }, [setStep]);
+  }, [clearTimers, scheduleTimer, setStep]);
 
-  // ── Main pipeline ──────────────────────────────────────────────────────
   const analyze = useCallback(async () => {
     const validationError = validate();
-    if (validationError) { setError(validationError); return; }
 
-    // Reset state
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    const cleanResume = resume.trim();
+    const cleanJobUrl = jobUrl.trim();
+
     setError(null);
     setReport(null);
     setStepStatus(makeStepStatus());
     setScreen(SCREENS.PROCESSING);
 
-    // Start simulated step advancement
     startProgressSimulation();
 
     try {
-      // Single call — the analysis service runs all 3 chains internally
-      const n8nData = await callN8nWebhook(resume, jobUrl);
+      const n8nData = await callN8nWebhook(cleanResume, cleanJobUrl);
 
-      // Clear simulated timers — response arrived
       clearTimers();
 
-      // Mark final steps as done (handles fast responses)
-      setStep("chain2", STEP_STATUS.DONE);
-      setStep("chain3", STEP_STATUS.DONE);
+      setStepStatus({
+        fetch: STEP_STATUS.DONE,
+        chain1: STEP_STATUS.DONE,
+        chain2: STEP_STATUS.DONE,
+        chain3: STEP_STATUS.DONE,
+      });
 
-      // Build the full UI-ready report
       const finalReport = buildReportFromN8n(n8nData);
 
       setReport(finalReport);
@@ -139,37 +154,46 @@ const useAnalysis = () => {
     } catch (err) {
       clearTimers();
 
-      // SERVICE_NOT_CONFIGURED is a dev-time sentinel — translate it to a
-      // generic user message so no env var names or stack details are shown.
+      setStepStatus((prev) => ({
+        ...prev,
+        chain3: STEP_STATUS.ERROR,
+      }));
+
       const userMessage =
-        err.message === "SERVICE_NOT_CONFIGURED"
+        err?.message === "SERVICE_NOT_CONFIGURED"
           ? "The analysis service is not available. Please contact support."
-          : err.message;
+          : err?.message || "Something went wrong while analysing your resume.";
 
       setError(userMessage);
       setScreen(SCREENS.INPUT);
     }
-  }, [validate, resume, jobUrl, startProgressSimulation, setStep]);
+  }, [validate, resume, jobUrl, startProgressSimulation, clearTimers]);
 
-  // ── Reset ──────────────────────────────────────────────────────────────
   const reset = useCallback(() => {
     clearTimers();
     setScreen(SCREENS.INPUT);
     setReport(null);
     setError(null);
     setStepStatus(makeStepStatus());
-  }, []);
+  }, [clearTimers]);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      clearTimers();
+    };
+  }, [clearTimers]);
 
   return {
-    // Form inputs
-    resume, setResume,
-    jobUrl, setJobUrl,
-    // App state
+    resume,
+    setResume,
+    jobUrl,
+    setJobUrl,
     screen,
     stepStatus,
     report,
-    error, setError,
-    // Actions
+    error,
+    setError,
     analyze,
     reset,
   };
