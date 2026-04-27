@@ -9,50 +9,110 @@
  */
 
 // ─── App screens ─────────────────────────────────────────────────────────────
+
 export const SCREENS = {
-  INPUT:      "input",
+  INPUT: "input",
   PROCESSING: "processing",
-  RESULTS:    "results",
+  RESULTS: "results",
 };
 
-// ─── Processing chain steps (mirrors the actual n8n nodes) ───────────────────
-// Progress is SIMULATED on the frontend — n8n is one async webhook call.
+// ─── Processing chain steps ─────────────────────────────────────────────────
+
 export const CHAIN_STEPS = [
-  { key: "fetch",  label: "Fetching the job listing page"          },
-  { key: "chain1", label: "Extracting job title & requirements"     },
-  { key: "chain2", label: "Analysing your resume against the role"  },
-  { key: "chain3", label: "Generating your action plan"             },
+  {
+    key: "fetch",
+    label: "Fetching the job listing page",
+  },
+  {
+    key: "chain1",
+    label: "Extracting job title & requirements",
+  },
+  {
+    key: "chain2",
+    label: "Analysing your resume against the role",
+  },
+  {
+    key: "chain3",
+    label: "Generating your action plan",
+  },
 ];
 
-// ─── Step timings for simulated progress (ms) ────────────────────────────────
-// Mirrors average n8n execution time (~40–60s total).
+// ─── Step timings for simulated progress (ms) ───────────────────────────────
+
 export const STEP_TIMINGS = {
-  fetch_start:  200,
-  fetch_done:   4000,
-  chain1_done:  14000,
-  chain2_done:  30000,
-  // chain3 completes when the real API response arrives
+  fetch_start: 200,
+  fetch_done: 4000,
+  chain1_done: 14000,
+  chain2_done: 30000,
+  fallback_timeout: 60000, // safety timeout
 };
 
-// ─── Chain step statuses ──────────────────────────────────────────────────────
+// ─── Chain step statuses ────────────────────────────────────────────────────
+
 export const STEP_STATUS = {
-  IDLE:    "idle",
+  IDLE: "idle",
   RUNNING: "running",
-  DONE:    "done",
-  ERROR:   "error",
+  DONE: "done",
+  ERROR: "error",
 };
 
-// ─── Results tabs ─────────────────────────────────────────────────────────────
+// ─── Results tabs ───────────────────────────────────────────────────────────
+
 export const RESULT_TABS = [
-  { key: "overview", label: "Overview"     },
-  { key: "gaps",     label: "Gap Analysis" },
-  { key: "plan",     label: "Action Plan"  },
-  { key: "report",   label: "Full Report"  },
+  {
+    key: "overview",
+    label: "Overview",
+  },
+  {
+    key: "gaps",
+    label: "Gap Analysis",
+  },
+  {
+    key: "plan",
+    label: "Action Plan",
+  },
+  {
+    key: "report",
+    label: "Full Report",
+  },
 ];
 
-// ─── Score bands ──────────────────────────────────────────────────────────────
+// ─── Score bands ────────────────────────────────────────────────────────────
+
 export const SCORE_BANDS = {
-  STRONG:  { min: 70, label: "Strong Match",  color: "#10b981" },
-  PARTIAL: { min: 45, label: "Partial Match", color: "#f59e0b" },
-  WEAK:    { min: 0,  label: "Needs Work",    color: "#ef4444" },
+  STRONG: {
+    min: 70,
+    label: "Strong Match",
+    color: "#10b981",
+  },
+
+  PARTIAL: {
+    min: 45,
+    label: "Partial Match",
+    color: "#f59e0b",
+  },
+
+  WEAK: {
+    min: 0,
+    label: "Needs Work",
+    color: "#ef4444",
+  },
+};
+
+// ─── Validation limits ──────────────────────────────────────────────────────
+
+export const LIMITS = {
+  MAX_RESUME_CHARS: 6000,
+  MIN_RESUME_CHARS: 50,
+  MAX_JOB_URL_LENGTH: 500,
+};
+
+// ─── Default fallback messages ──────────────────────────────────────────────
+
+export const FALLBACK_TEXT = {
+  EMPTY_ANALYSIS: "No analysis available.",
+  EMPTY_ACTION_PLAN: "No action plan available.",
+  EMPTY_REPORT: "No full report available.",
+  UNKNOWN_ROLE: "Unknown Role",
+  UNKNOWN_COMPANY: "Unknown Company",
 };
