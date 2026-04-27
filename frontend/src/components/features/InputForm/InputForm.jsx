@@ -15,7 +15,7 @@ const InputForm = ({
     {/* ── Hero ──────────────────────────────────────────────────────────── */}
     <div className="max-w-xl mb-10 animate-fade-up">
       <div className="mb-5">
-        <Tag color="#2563eb">AI-Powered Gap Analysis · 3MTT Cohort 2</Tag>
+        <Tag color="#2563eb">AI-Powered Gap Analysis </Tag>
       </div>
 
       <h1 className="font-display text-4xl font-extrabold tracking-tight leading-[1.15] text-slate-900 dark:text-slate-50 mb-4">
@@ -24,8 +24,7 @@ const InputForm = ({
       </h1>
 
       <p className="text-[15px] leading-relaxed text-slate-500 dark:text-slate-400">
-        Paste your resume and a job URL. The n8n workflow scrapes the listing,
-        runs 3 Gemini AI chains, and returns a full gap analysis with a
+        Paste your resume and a job URL and get a full gap analysis with a
         personalised learning roadmap.
       </p>
     </div>
@@ -56,7 +55,7 @@ const InputForm = ({
     <div className="flex items-center gap-4 animate-fade-up delay-3">
       <Button onClick={onAnalyze}>⚡ Analyze My Fit</Button>
       <span className="text-sm text-slate-400 dark:text-slate-500">
-        ~30–60 seconds · 3 Gemini chains · Powered by n8n
+        ~30–60 seconds 
       </span>
     </div>
   </main>
