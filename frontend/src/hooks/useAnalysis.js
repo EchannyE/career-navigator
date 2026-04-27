@@ -121,25 +121,32 @@ const useAnalysis = () => {
     startProgressSimulation();
 
     try {
-      // Single call — n8n runs all 3 chains internally
-      // Body: { resume, jobUrl } → n8n Webhook node reads $json.body.resume / $json.body.jobUrl
+      // Single call — the analysis service runs all 3 chains internally
       const n8nData = await callN8nWebhook(resume, jobUrl);
 
       // Clear simulated timers — response arrived
       clearTimers();
 
-      // Mark chain3 as done (final step)
-      setStep("chain2", STEP_STATUS.DONE); // ensure done if response was fast
+      // Mark final steps as done (handles fast responses)
+      setStep("chain2", STEP_STATUS.DONE);
       setStep("chain3", STEP_STATUS.DONE);
 
-      // Build the full UI-ready report from the n8n response
+      // Build the full UI-ready report
       const finalReport = buildReportFromN8n(n8nData);
 
       setReport(finalReport);
       setScreen(SCREENS.RESULTS);
     } catch (err) {
       clearTimers();
-      setError(`Analysis failed: ${err.message}`);
+
+      // SERVICE_NOT_CONFIGURED is a dev-time sentinel — translate it to a
+      // generic user message so no env var names or stack details are shown.
+      const userMessage =
+        err.message === "SERVICE_NOT_CONFIGURED"
+          ? "The analysis service is not available. Please contact support."
+          : err.message;
+
+      setError(userMessage);
       setScreen(SCREENS.INPUT);
     }
   }, [validate, resume, jobUrl, startProgressSimulation, setStep]);
