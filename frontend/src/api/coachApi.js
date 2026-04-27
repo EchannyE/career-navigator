@@ -3,109 +3,150 @@
  *
  * Separation of Concerns: ALL external network calls live here.
  * Components and hooks never call fetch() directly.
+ *
+ * Backend: n8n Webhook trigger (regular Webhook node, not Chat Trigger)
+ * Workflow: P5 - Career Coach Navigator
+ * Model:    gemini-2.5-flash-lite (managed entirely by n8n)
+ *
+ * The frontend sends a structured JSON body to the n8n Webhook node.
+ * n8n reads fields via:
+ *   {{ $json.body.resume }}  and  {{ $json.body.jobUrl }}
+ *
+ * n8n handles internally:
+ *   - Scraping the jobUrl (HTTP Request node)
+ *   - Chain 1: Job Content Extractor  (Gemini, temp 0.2)
+ *   - Chain 2: Gap Analyzer           (Gemini, temp 0.4)
+ *   - Chain 3: Action Plan Generator  (Gemini, temp 0.7)
+ *   - Code Node: assembles final JSON report
+ *   - Google Sheets: appends a log row
  */
-
-import {
-  CLAUDE_MODEL,
-  CLAUDE_MAX_TOKENS,
-  CORS_PROXY,
-  MAX_HTML_LENGTH,
-  SCRAPE_TIMEOUT_MS,
-} from "../constants/index.js";
-
-// ─── Claude API ───────────────────────────────────────────────────────────────
 
 /**
- * Sends a single prompt to the Claude API and returns the text response.
+ * Posts the resume and job URL to the n8n Webhook and returns the
+ * parsed report object assembled by the Code Node.
  *
- * @param {string} system    - System instruction for the model
- * @param {string} userMsg   - The user-turn content
- * @param {number} maxTokens - Max tokens for this call (default from constants)
- * @returns {Promise<string>} Model text response
- * @throws {Error} If the API call fails
- */
-export const callClaude = async (
-  system,
-  userMsg,
-  maxTokens = CLAUDE_MAX_TOKENS
-) => {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: "user", content: userMsg }],
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `Claude API error ${response.status}`);
-  }
-
-  const data = await response.json();
-
-  if (data.error) throw new Error(data.error.message);
-
-  return data.content[0].text;
-};
-
-// ─── Job Page Scraper ─────────────────────────────────────────────────────────
-
-/**
- * Fetches the raw HTML of a job listing URL via a CORS proxy.
- * Returns an empty string on any failure — callers handle the fallback.
+ * Request body sent to n8n:
+ * {
+ *   "resume": "<candidate resume text>",
+ *   "jobUrl": "https://..."
+ * }
  *
- * @param {string} url - The full job listing URL
- * @returns {Promise<string>} Raw HTML or empty string
- */
-export const fetchJobPage = async (url) => {
-  try {
-    const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl, {
-      signal: AbortSignal.timeout(SCRAPE_TIMEOUT_MS),
-    });
-
-    if (!response.ok) return "";
-
-    const html = await response.text();
-    return html.slice(0, MAX_HTML_LENGTH);
-  } catch {
-    return "";
-  }
-};
-
-// ─── n8n Webhook (alternative backend) ───────────────────────────────────────
-
-/**
- * Sends the chat message to the n8n Chat Trigger webhook.
- * Use this if you want to run the 3-chain pipeline through n8n
- * instead of calling Claude directly from the browser.
+ * n8n Code Node response shape:
+ * {
+ *   metadata: {
+ *     generatedAt: string (ISO),
+ *     jobTitle:    string,
+ *     company:     string,
+ *     jobUrl:      string,
+ *     matchScore:  string   ← "78%" — string, not a number
+ *   },
+ *   resumeInput: string,
+ *   gapAnalysis: string,    ← Chain 2 full text output
+ *   actionPlan:  string,    ← Chain 3 full text output
+ *   fullReport:  string
+ * }
  *
- * @param {string} chatInput - Formatted message with resume + job URL
- * @returns {Promise<Object>} n8n workflow response
- * @throws {Error} If the webhook call fails
+ * @param {string} resume - Candidate's plain-text resume
+ * @param {string} jobUrl - Full job listing URL for n8n to scrape
+ * @returns {Promise<Object>} Parsed n8n Code Node output
+ * @throws {Error} On network failure, bad HTTP status, or missing fields
  */
-export const callN8nWebhook = async (chatInput) => {
+export const callN8nWebhook = async (resume, jobUrl) => {
   const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
 
+  // ── Config guard — never shown to users; caught during development only ──
   if (!webhookUrl) {
+    throw new Error("SERVICE_NOT_CONFIGURED");
+  }
+
+  let response;
+  try {
+    response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resume, jobUrl }),
+    });
+  } catch {
+    // Network failure (offline, DNS error, CORS, timeout)
     throw new Error(
-      "VITE_N8N_WEBHOOK_URL is not set. Add it to your .env file."
+      "Unable to reach the analysis service. Please check your internet connection and try again."
     );
   }
 
-  const response = await fetch(webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chatInput }),
-  });
-
+  // Map HTTP error codes to user-friendly messages — no status codes exposed
   if (!response.ok) {
-    throw new Error(`n8n webhook error: HTTP ${response.status}`);
+    const userMessage = resolveHttpError(response.status);
+    throw new Error(userMessage);
   }
 
-  return response.json();
+  let raw;
+  try {
+    raw = await response.json();
+  } catch {
+    throw new Error(
+      "The analysis service returned an unreadable response. Please try again."
+    );
+  }
+
+  // Normalise the response into a consistent shape
+  const data = normaliseResponse(raw);
+
+  if (!data?.metadata || !data?.gapAnalysis || !data?.actionPlan) {
+    throw new Error(
+      "The analysis could not be completed. Please verify the job URL is publicly accessible and try again."
+    );
+  }
+
+  return data;
+};
+
+/**
+ * Maps HTTP status codes to user-friendly messages.
+ * Internal codes, service names, and stack details are never exposed.
+ *
+ * @param {number} status - HTTP response status code
+ * @returns {string} User-safe error message
+ */
+const resolveHttpError = (status) => {
+  if (status === 400)
+    return "The request was invalid. Please check your resume and job URL, then try again.";
+  if (status === 401 || status === 403)
+    return "Access to the analysis service was denied. Please contact support.";
+  if (status === 404)
+    return "The analysis service could not be found. Please contact support.";
+  if (status === 429)
+    return "Too many requests — please wait a moment and try again.";
+  if (status >= 500)
+    return "The analysis service is temporarily unavailable. Please try again in a few minutes.";
+  return "Something went wrong during analysis. Please try again.";
+};
+
+/**
+ * Normalises various response shapes into one consistent object.
+ * Internal implementation details are intentionally absent from this name.
+ *
+ * Handles:
+ *   - Array:           [{ metadata, gapAnalysis, ... }]   → first item
+ *   - Nested json key: { json: { metadata, ... } }        → unwrap
+ *   - Direct object:   { metadata, gapAnalysis, ... }     → as-is
+ *
+ * @param {*} raw - Raw parsed JSON from the service response
+ * @returns {Object|null}
+ */
+const normaliseResponse = (raw) => {
+  if (!raw) return null;
+
+  // Case 1: n8n wraps output in an array
+  if (Array.isArray(raw)) {
+    const first = raw[0];
+    return first?.json || first || null;
+  }
+
+  // Case 2: wrapped in { json: { ... } }
+  if (raw.json?.metadata) return raw.json;
+
+  // Case 3: direct object with expected keys
+  if (raw.metadata) return raw;
+
+  return null;
 };
