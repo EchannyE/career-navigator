@@ -1,37 +1,27 @@
 
 import { SCORE_BANDS } from "../constants/index.js";
 
-/**
- * Extracts a single-line field value from structured AI text.
- * Handles patterns like "JOB TITLE: Senior Backend Engineer"
- *
- * @param {string} text  - The raw AI response text
- * @param {string} field - The field name to search for
- * @returns {string} Extracted value or "Unknown"
- */
-export const extractField = (text, field) => {
-  const match = text.match(new RegExp(`${field}:\\s*(.+)`, "i"));
-  return match ? match[1].trim().replace(/\*+/g, "") : "Unknown";
-};
+// ─── Field extractors ─────────────────────────────────────────────────────────
 
 /**
- * Extracts the numeric match score (0–100) from the gap analysis text.
+ * Parses the matchScore string from n8n metadata ("78%") into an integer.
+ * Falls back to 0 if the string can't be parsed.
  *
- * @param {string} text - Chain 2 AI response text
- * @returns {number} Integer match score
+ * @param {string} matchScoreStr - e.g. "78%"
+ * @returns {number} Integer 0–100
  */
-export const extractMatchScore = (text) => {
-  const match = text.match(/MATCH SCORE:\s*(\d+)/i);
+export const parseMatchScore = (matchScoreStr = "") => {
+  const match = String(matchScoreStr).match(/(\d+)/);
   return match ? Math.min(100, Math.max(0, parseInt(match[1]))) : 0;
 };
 
 /**
- * Extracts a bullet-point section from AI text into a string array.
- * Stops at the next all-caps section header.
+ * Extracts a bullet-point section from AI text into a clean string array.
+ * Stops at the next all-caps section heading or end of string.
  *
- * @param {string} text          - Full AI response text
- * @param {string} headerPattern - Regex pattern for the section header
- * @returns {string[]} Array of bullet point strings
+ * @param {string} text          - Full AI chain output text
+ * @param {string} headerPattern - Regex pattern for the section title
+ * @returns {string[]} Array of bullet strings
  */
 export const parseBulletSection = (text, headerPattern) => {
   const sectionMatch = text.match(
@@ -48,68 +38,80 @@ export const parseBulletSection = (text, headerPattern) => {
 };
 
 /**
- * Extracts the overall assessment paragraph from gap analysis text.
+ * Extracts the OVERALL ASSESSMENT paragraph from the gap analysis text.
  *
- * @param {string} text - Chain 2 AI response text
- * @returns {string} Assessment paragraph
+ * @param {string} text - Chain 2 output
+ * @returns {string}
  */
 export const extractAssessment = (text) => {
-  const match = text.match(
-    /OVERALL ASSESSMENT:\s*([\s\S]+?)(?:\n---|$)/i
-  );
+  const match = text.match(/OVERALL ASSESSMENT:\s*([\s\S]+?)(?:\n---|$)/i);
   return match ? match[1].trim() : "";
 };
 
 /**
- * Returns the score band label and color based on the numeric score.
+ * Returns the score band (label + color) for a given numeric score.
  *
- * @param {number} score - Match score 0–100
+ * @param {number} score
  * @returns {{ label: string, color: string }}
  */
 export const getScoreBand = (score) => {
-  if (score >= SCORE_BANDS.STRONG.min) return SCORE_BANDS.STRONG;
+  if (score >= SCORE_BANDS.STRONG.min)  return SCORE_BANDS.STRONG;
   if (score >= SCORE_BANDS.PARTIAL.min) return SCORE_BANDS.PARTIAL;
   return SCORE_BANDS.WEAK;
 };
 
-/**
- * Assembles a complete, structured report object from all 3 chain outputs.
- *
- * @param {Object} params
- * @param {string} params.resume        - Original resume text
- * @param {string} params.jobUrl        - Original job URL
- * @param {string} params.chain1        - Chain 1 output (job extraction)
- * @param {string} params.chain2        - Chain 2 output (gap analysis)
- * @param {string} params.chain3        - Chain 3 output (action plan)
- * @returns {Object} Fully structured report object
- */
-export const buildReport = ({ resume, jobUrl, chain1, chain2, chain3 }) => {
-  const jobTitle      = extractField(chain1, "JOB TITLE");
-  const company       = extractField(chain1, "COMPANY NAME");
-  const matchScore    = extractMatchScore(chain2);
-  const scoreBand     = getScoreBand(matchScore);
-  const matchedSkills = parseBulletSection(chain2, "MATCHED SKILLS");
-  const skillGaps     = parseBulletSection(chain2, "SKILL GAPS");
-  const expGaps       = parseBulletSection(chain2, "EXPERIENCE GAPS");
-  const missingKw     = parseBulletSection(chain2, "MISSING KEYWORDS");
-  const assessment    = extractAssessment(chain2);
-  const generatedAt   = new Date().toISOString();
+// ─── Main builder ─────────────────────────────────────────────────────────────
 
-  const fullReport =
-    `=== CAREER COACH NAVIGATOR REPORT ===\n\n` +
-    `Role: ${jobTitle} at ${company}\n` +
-    `Match Score: ${matchScore}%\n` +
-    `Generated: ${new Date().toLocaleString()}\n\n` +
-    `--- GAP ANALYSIS ---\n${chain2}\n\n` +
-    `--- ACTION PLAN ---\n${chain3}`;
+/**
+ * Builds a complete, UI-ready report object from the n8n Code Node response.
+ *
+ * The n8n workflow returns:
+ *   { metadata, resumeInput, gapAnalysis, actionPlan, fullReport }
+ *
+ * This function enriches it with:
+ *   - numeric matchScore (parsed from "78%" string)
+ *   - scoreBand object
+ *   - parsed section arrays (matchedSkills, skillGaps, expGaps, missingKw)
+ *   - assessment paragraph
+ *
+ * @param {Object} n8nData - Raw response from callN8nWebhook()
+ * @returns {Object} Fully structured report for the Results dashboard
+ */
+export const buildReportFromN8n = (n8nData) => {
+  const { metadata, resumeInput, gapAnalysis, actionPlan, fullReport } = n8nData;
+
+  // Parse score from "78%" string → integer 78
+  const matchScore = parseMatchScore(metadata.matchScore);
+  const scoreBand  = getScoreBand(matchScore);
+
+  // Parse the gapAnalysis text into arrays for the Overview tab
+  const matchedSkills = parseBulletSection(gapAnalysis, "MATCHED SKILLS");
+  const skillGaps     = parseBulletSection(gapAnalysis, "SKILL GAPS");
+  const expGaps       = parseBulletSection(gapAnalysis, "EXPERIENCE GAPS");
+  const missingKw     = parseBulletSection(gapAnalysis, "MISSING KEYWORDS");
+  const assessment    = extractAssessment(gapAnalysis);
 
   return {
-    metadata: { generatedAt, jobTitle, company, jobUrl, matchScore, scoreBand },
-    resumeInput: resume,
-    jobDescription: chain1,
-    gapAnalysis: chain2,
-    actionPlan: chain3,
-    parsed: { matchedSkills, skillGaps, expGaps, missingKw, assessment },
+    // Enriched metadata
+    metadata: {
+      ...metadata,
+      matchScore,   // overwrite string with integer
+      scoreBand,    // add score band label + color
+    },
+
+    // Raw AI outputs (used in text tabs)
+    resumeInput,
+    gapAnalysis,
+    actionPlan,
     fullReport,
+
+    // Parsed data (used in Overview tab + hero card)
+    parsed: {
+      matchedSkills,
+      skillGaps,
+      expGaps,
+      missingKw,
+      assessment,
+    },
   };
 };
