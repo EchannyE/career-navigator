@@ -39,7 +39,7 @@ const ProcessingView = ({ stepStatus }) => {
         Analyzing your career fit…
       </h2>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-10 animate-fade-up delay-2">
-        Our AI is running {total} chain steps — this takes about 30–60 seconds
+        Our AI is running, this will takes about 30–60 seconds
       </p>
 
       {/* Steps card */}
