@@ -30,9 +30,6 @@ const JobInput = ({ jobUrl, onUrlChange }) => (
         />
       </div>
 
-      <p className="mt-2 text-xs text-slate-400 dark:text-slate-500 leading-relaxed">
-        The n8n workflow scrapes this URL directly via its HTTP Request node.
-      </p>
     </div>
 
     {/* Compatible platforms */}
