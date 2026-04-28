@@ -14,7 +14,7 @@ export const parseBulletSection = (text = "", headerPattern = "") => {
 
   const sectionMatch = String(text).match(
     new RegExp(
-      `${headerPattern}\\s*:?\\s*\\n([\\s\\S]*?)(?=\\n[A-Z][A-Z\\s]+:|$)`,
+      `${headerPattern}\\s*:?\\s*\\n([\\s\\S]*?)(?=\\n[A-Z][A-Z\\s]+:|\\n---|$)`,
       "i"
     )
   );
@@ -47,13 +47,19 @@ export const getScoreBand = (score = 0) => {
 // ─── Main builder ─────────────────────────────────────────────────────────────
 
 export const buildReportFromN8n = (n8nData = {}) => {
+  const payload = n8nData?.data || n8nData?.json || n8nData || {};
+
   const {
     metadata = {},
     resumeInput = "",
     gapAnalysis = "",
     actionPlan = "",
-    fullReport = "",
-  } = n8nData || {};
+    fullReport = payload.report || "",
+  } = payload;
+
+  if (!gapAnalysis && !actionPlan && !fullReport) {
+    throw new Error("The analysis service returned an unreadable response.");
+  }
 
   const matchScore = parseMatchScore(metadata.matchScore);
   const scoreBand = getScoreBand(matchScore);
