@@ -1,7 +1,5 @@
 import { SCORE_BANDS } from "../constants/index.js";
 
-// ─── Field extractors ─────────────────────────────────────────────────────────
-
 export const parseMatchScore = (matchScoreStr = "") => {
   const match = String(matchScoreStr).match(/(\d+)/);
   const score = match ? Number.parseInt(match[1], 10) : 0;
@@ -44,14 +42,13 @@ export const getScoreBand = (score = 0) => {
   return SCORE_BANDS.WEAK;
 };
 
-// ─── Main builder ─────────────────────────────────────────────────────────────
-
 export const buildReportFromN8n = (n8nData = {}) => {
   const payload = n8nData?.data || n8nData?.json || n8nData || {};
 
   const {
     metadata = {},
     resumeInput = "",
+    jobDescription = "",
     gapAnalysis = "",
     actionPlan = "",
     fullReport = payload.report || "",
@@ -68,6 +65,10 @@ export const buildReportFromN8n = (n8nData = {}) => {
   const skillGaps = parseBulletSection(gapAnalysis, "SKILL GAPS");
   const expGaps = parseBulletSection(gapAnalysis, "EXPERIENCE GAPS");
   const missingKw = parseBulletSection(gapAnalysis, "MISSING KEYWORDS");
+  const transferableStrengths = parseBulletSection(
+    gapAnalysis,
+    "TRANSFERABLE STRENGTHS"
+  );
   const assessment = extractAssessment(gapAnalysis);
 
   return {
@@ -81,6 +82,7 @@ export const buildReportFromN8n = (n8nData = {}) => {
     },
 
     resumeInput,
+    jobDescription,
     gapAnalysis,
     actionPlan,
     fullReport,
@@ -90,6 +92,7 @@ export const buildReportFromN8n = (n8nData = {}) => {
       skillGaps,
       expGaps,
       missingKw,
+      transferableStrengths,
       assessment,
     },
   };
