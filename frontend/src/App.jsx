@@ -17,6 +17,10 @@ const App = () => {
   const {
     resume,
     setResume,
+    resumeMode,
+    setResumeMode,
+    jobMode,
+    setJobMode,
     jobUrl,
     setJobUrl,
     screen,
@@ -54,10 +58,15 @@ const App = () => {
     <Layout>
       <Header isDark={isDark} toggleDark={toggleDark} rightSlot={resultsSlot} />
 
+
       {screen === SCREENS.INPUT && (
         <InputForm
           resume={resume}
           onResumeChange={setResume}
+          resumeMode={resumeMode}
+          onResumeModeChange={setResumeMode}
+          jobMode={jobMode}
+          onJobModeChange={setJobMode}
           jobUrl={jobUrl}
           onUrlChange={setJobUrl}
           onAnalyze={analyze}
