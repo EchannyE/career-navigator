@@ -121,7 +121,7 @@ const ResultsDashboard = ({ report, onReset }) => {
       {/* Action buttons */}
       <div className="flex flex-col sm:flex-row gap-3 animate-fade-up delay-2">
         <Button onClick={onReset}>↩ Run Another Analysis</Button>
-        <Button variant="ghost" onClick={() => downloadReport(fullReport)}>
+        <Button variant="ghost" onClick={() => downloadReport(report)}>
           ⬇ Download Report
         </Button>
       </div>
