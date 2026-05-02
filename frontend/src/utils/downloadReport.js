@@ -1,115 +1,238 @@
-export const downloadReport = (content = "", filename) => {
-  if (!content || !String(content).trim()) {
+const escapeHtml = (str = "") =>
+  String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+const formatSmartText = (text = "") => {
+  if (!text) return "<p>No content available.</p>";
+
+  const lines = String(text)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  let html = "";
+  let inList = false;
+
+  const closeList = () => {
+    if (inList) {
+      html += "</ul>";
+      inList = false;
+    }
+  };
+
+  lines.forEach((line) => {
+    const isHeading =
+      /^[A-Z][A-Z\s\-()]+:?$/.test(line) ||
+      /^(MATCH SCORE|MATCHED SKILLS|SKILL GAPS|EXPERIENCE GAPS|MISSING KEYWORDS|TRANSFERABLE STRENGTHS|OVERALL ASSESSMENT|HIGH PRIORITY|MEDIUM PRIORITY|QUICK WINS|RESUME IMPROVEMENT TIPS|ENCOURAGEMENT)/i.test(line);
+
+    const isBullet = /^[-•*]\s+/.test(line);
+    const isNumbered = /^\d+\.\s+/.test(line);
+
+    if (isHeading) {
+      closeList();
+      html += `<h3>${escapeHtml(line).replace(/:$/, "")}</h3>`;
+      return;
+    }
+
+    if (isBullet || isNumbered) {
+      if (!inList) {
+        html += "<ul>";
+        inList = true;
+      }
+
+      const bulletText = line
+        .replace(/^[-•*]\s+/, "")
+        .replace(/^\d+\.\s+/, "");
+
+      html += `<li>${escapeHtml(bulletText)}</li>`;
+      return;
+    }
+
+    closeList();
+    html += `<p>${escapeHtml(line)}</p>`;
+  });
+
+  closeList();
+  return html;
+};
+
+export const DownloadReport = (report) => {
+  if (!report || !report.fullReport) {
     console.warn("No report content available for download.");
     return;
   }
+
+  const { metadata = {}, gapAnalysis = "", actionPlan = "" } = report;
 
   const safeTimestamp = new Date()
     .toISOString()
     .slice(0, 19)
     .replace(/[:T]/g, "-");
 
-  const name = filename || `career-coach-report-${safeTimestamp}.html`;
-
-  const escapedContent = String(content)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  const name = `career-coach-report-${safeTimestamp}.html`;
 
   const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Career Coach Navigator Report</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f8fafc;
-      color: #0f172a;
-      padding: 40px;
-      line-height: 1.7;
-    }
+<meta charset="UTF-8" />
+<title>Career Coach Navigator Report</title>
 
-    .container {
-      max-width: 850px;
-      margin: auto;
-      background: #ffffff;
-      padding: 40px;
-      border-radius: 18px;
-      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
-      border: 1px solid #e2e8f0;
-    }
+<style>
+  body {
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f8fafc;
+    color: #0f172a;
+    padding: 40px;
+    line-height: 1.7;
+  }
 
-    .header {
-      border-bottom: 3px solid #2563eb;
-      padding-bottom: 20px;
-      margin-bottom: 30px;
-    }
+  .container {
+    max-width: 920px;
+    margin: auto;
+    background: #ffffff;
+    padding: 42px;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.08);
+  }
 
-    .badge {
-      display: inline-block;
-      background: #dbeafe;
-      color: #1d4ed8;
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: bold;
-      margin-bottom: 12px;
-    }
+  .header {
+    border-bottom: 3px solid #2563eb;
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
 
-    h1 {
-      margin: 0;
-      font-size: 30px;
-      color: #0f172a;
-    }
+  .badge {
+    display: inline-block;
+    background: #dbeafe;
+    color: #1d4ed8;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
 
-    .subtitle {
-      color: #64748b;
-      margin-top: 8px;
-    }
+  h1 {
+    margin: 0;
+    font-size: 30px;
+    letter-spacing: -0.03em;
+  }
 
-    pre {
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      font-family: Arial, sans-serif;
-      font-size: 15px;
-    }
+  .meta {
+    margin-top: 12px;
+    color: #64748b;
+    font-size: 14px;
+  }
 
-    .footer {
-      margin-top: 35px;
-      padding-top: 20px;
-      border-top: 1px solid #e2e8f0;
-      font-size: 12px;
-      color: #64748b;
-      text-align: center;
-    }
+  .score-card {
+    display: inline-flex;
+    margin-top: 16px;
+    padding: 10px 14px;
+    background: #ecfdf5;
+    color: #047857;
+    border-radius: 12px;
+    font-weight: 800;
+    border: 1px solid #a7f3d0;
+  }
 
-    @media print {
-      body {
-        background: white;
-        padding: 0;
-      }
+  .section {
+    margin-top: 32px;
+  }
 
-      .container {
-        box-shadow: none;
-        border: none;
-      }
-    }
-  </style>
+  .section-title {
+    font-size: 18px;
+    color: #1d4ed8;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  h3 {
+    font-size: 14px;
+    color: #0f172a;
+    margin: 22px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #334155;
+  }
+
+  ul {
+    margin: 8px 0 16px 0;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  li {
+    position: relative;
+    margin: 8px 0;
+    padding: 10px 12px 10px 34px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #334155;
+  }
+
+  li::before {
+    content: "✓";
+    position: absolute;
+    left: 12px;
+    top: 10px;
+    color: #2563eb;
+    font-weight: 800;
+  }
+
+  .footer {
+    margin-top: 42px;
+    padding-top: 18px;
+    border-top: 1px solid #e2e8f0;
+    text-align: center;
+    color: #64748b;
+    font-size: 12px;
+  }
+</style>
 </head>
+
 <body>
   <div class="container">
     <div class="header">
       <div class="badge">Career Coach Navigator</div>
       <h1>AI Career Fit Report</h1>
-      <p class="subtitle">Personalized resume-to-job gap analysis and action plan</p>
+
+      <div class="meta">
+        <strong>${escapeHtml(metadata.jobTitle || "Unknown Role")}</strong>
+        at
+        <strong>${escapeHtml(metadata.company || "Unknown Company")}</strong><br />
+        Mode: ${escapeHtml(metadata.mode || "N/A")}<br />
+        Generated: ${new Date(metadata.generatedAt || Date.now()).toLocaleString()}
+      </div>
+
+      <div class="score-card">
+        Match Score: ${escapeHtml(metadata.matchScore || "0%")}
+      </div>
     </div>
 
-    <pre>${escapedContent}</pre>
+    <section class="section">
+      <h2 class="section-title">Gap Analysis</h2>
+      ${formatSmartText(gapAnalysis)}
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Action Plan</h2>
+      ${formatSmartText(actionPlan)}
+    </section>
 
     <div class="footer">
-      Generated by Career Coach Navigator
+      Generated by Career Coach Navigator · AI-powered resume-to-job analysis
     </div>
   </div>
 </body>
@@ -122,16 +245,15 @@ export const downloadReport = (content = "", filename) => {
 
   const url = URL.createObjectURL(blob);
 
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = name;
-  anchor.style.display = "none";
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 100);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 };
+
+// Backward-compatible export
+export const downloadReport = DownloadReport;
