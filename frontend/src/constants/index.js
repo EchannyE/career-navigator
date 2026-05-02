@@ -4,8 +4,12 @@
  *
  * Backend: P5 - Career Coach Navigator (n8n)
  * Trigger: Webhook node (POST)
- * Body:    { resume: string, jobUrl: string }
- * Model:   gemini-2.5-flash-lite (via googlePalmApi credential)
+ *
+ * Payload:
+ *   URL mode   → { resume: string, jobUrl: string, jobDescription: "" }
+ *   Paste mode → { resume: string, jobUrl: "", jobDescription: string }
+ *
+ * Model: gemini-2.5-flash-lite
  */
 
 // ─── App screens ─────────────────────────────────────────────────────────────
@@ -21,7 +25,7 @@ export const SCREENS = {
 export const CHAIN_STEPS = [
   {
     key: "fetch",
-    label: "Fetching the job listing page",
+    label: "Preparing job source", // works for both URL + paste
   },
   {
     key: "chain1",
@@ -59,22 +63,10 @@ export const STEP_STATUS = {
 // ─── Results tabs ───────────────────────────────────────────────────────────
 
 export const RESULT_TABS = [
-  {
-    key: "overview",
-    label: "Overview",
-  },
-  {
-    key: "gaps",
-    label: "Gap Analysis",
-  },
-  {
-    key: "plan",
-    label: "Action Plan",
-  },
-  {
-    key: "report",
-    label: "Full Report",
-  },
+  { key: "overview", label: "Overview" },
+  { key: "gaps", label: "Gap Analysis" },
+  { key: "plan", label: "Action Plan" },
+  { key: "report", label: "Full Report" },
 ];
 
 // ─── Score bands ────────────────────────────────────────────────────────────
@@ -102,8 +94,12 @@ export const SCORE_BANDS = {
 // ─── Validation limits ──────────────────────────────────────────────────────
 
 export const LIMITS = {
-  MAX_RESUME_CHARS: 6000,
-  MIN_RESUME_CHARS: 50,
+  MAX_RESUME_CHARS: 20000,
+  MIN_RESUME_CHARS: 30,
+
+  MAX_JOB_DESCRIPTION_CHARS: 20000,
+  MIN_JOB_DESCRIPTION_CHARS: 50,
+
   MAX_JOB_URL_LENGTH: 500,
 };
 
@@ -115,4 +111,13 @@ export const FALLBACK_TEXT = {
   EMPTY_REPORT: "No full report available.",
   UNKNOWN_ROLE: "Unknown Role",
   UNKNOWN_COMPANY: "Unknown Company",
+
+  MISSING_JOB_INPUT:
+    "Please provide a job URL or paste a job description to continue.",
+
+  INVALID_URL:
+    "Please enter a valid job URL starting with http:// or https://",
+
+  EMPTY_RESUME:
+    "Please provide your resume — paste it or upload a file.",
 };
