@@ -1,0 +1,741 @@
+{
+  "name": "P5 - Career Coach Navigator - Final Updated",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "career-coach-navigator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "18eb82b4-da1b-407a-a54b-b5aa57755560",
+      "name": "Frontend Input",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        144
+      ],
+      "webhookId": "2c6c2e73-1aa9-48c3-b841-de09c96f5e3b"
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "resume",
+              "stringValue": "={{ $json.body.resume || '' }}"
+            },
+            {
+              "name": "jobUrl",
+              "stringValue": "={{ $json.body.jobUrl || '' }}"
+            },
+            {
+              "name": "jobDescription",
+              "stringValue": "={{ $json.body.jobDescription || '' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7eacc95c-36e0-4f00-ac32-8abf087f3757",
+      "name": "Set Resume Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        -400,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.jobDescription }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a9e8f5f8-c8fa-4be1-87dd-27f642b8f7d2",
+      "name": "IF - Has Job Description",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Set Resume Data').first().json.jobUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "f403edb9-b7bb-4abc-b617-7ceb5eb9de0e",
+      "name": "HTTP Request - Job Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "prepare-1",
+              "name": "inputContent",
+              "value": "={{ $json.data?.trim() ? $json.data : ($json.jobDescription?.trim() ? $json.jobDescription : ($('Set Resume Data').first().json.jobDescription || 'NO CONTENT PROVIDED')) }}",
+              "type": "string"
+            },
+            {
+              "id": "prepare-2",
+              "name": "resume",
+              "value": "={{ $json.resume || $('Set Resume Data').first().json.resume || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "prepare-3",
+              "name": "jobUrl",
+              "value": "={{ $json.jobUrl || $('Set Resume Data').first().json.jobUrl || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "prepare-4",
+              "name": "jobDescription",
+              "value": "={{ $json.jobDescription || $('Set Resume Data').first().json.jobDescription || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "prepare-5",
+              "name": "mode",
+              "value": "={{ (($json.jobDescription || $('Set Resume Data').first().json.jobDescription || '').trim().length > 50) ? 'paste' : 'url' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a526e9af-dd21-45df-a314-73146289e68b",
+      "name": "Prepare Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Extract the job title, company name, and full cleaned job description from the content below.\n\nThe content may be:\n1. Raw HTML from a scraped job page\n2. Plain text pasted directly by the user\n\nRules:\n- If the content is HTML, remove scripts, styles, tags, navigation, cookies, ads, footer text, and unrelated content.\n- If the content is plain text, extract directly. Do not ask for more input.\n- Always return a usable job description if the content is job-related.\n- If job title is unclear, use this fallback: {{ $json.fallbackJobTitle }}\n- If company name is unclear, use this fallback: {{ $json.fallbackCompany }}\n- Do not invent requirements that are not present.\n- Do not add explanations or commentary.\n\nReturn ONLY this format:\n\nJOB TITLE: [title]\n\nCOMPANY NAME: [company]\n\nJOB DESCRIPTION:\n[full cleaned job description including responsibilities, requirements, qualifications, tools, technologies, and experience expectations]\n\nIf and ONLY if the content is truly empty, unreadable, blocked, or unrelated to a job listing, return ONLY:\n\nPAGE_ERROR: Missing or invalid job content.\n\nCONTENT:\n{{ $json.inputContent }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are a precise content extractor for job listings. Extract structured job information only. Never ask the user for more input if the provided content is job-related."
+            }
+          ]
+        }
+      },
+      "id": "0d57f386-aa58-47c5-821e-8febffa2759d",
+      "name": "Chain 1 - Job Content Extractor",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        688,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {
+          "maxOutputTokens": 900,
+          "temperature": 0.2
+        }
+      },
+      "id": "56d8ebb0-999d-436c-9c4a-694957126775",
+      "name": "Gemini - Job Extractor",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        688,
+        240
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "5BpItqFxZTLBh7LS",
+          "name": "Google Gemini(PaLM) Api account 5"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "f023be9c-8909-497f-ba73-4e7e0d3be683",
+      "name": "Wait 1",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        928,
+        32
+      ],
+      "webhookId": "41645a95-cb67-4fe3-92e7-c2126718d073"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze the candidate resume against the extracted job description.\n\nUse evidence-based reasoning:\n- Compare actual demonstrated skills, not just keyword matches.\n- Do not invent experience that is not in the resume.\n- Do not ignore important job requirements.\n- Consider transferable skills where relevant.\n- Separate direct matches from transferable strengths.\n- Be honest, specific, practical, and constructive.\n\nReturn your response in EXACTLY this format:\n\nMATCH SCORE: [A number from 0 to 100]%\n\nMATCHED SKILLS:\n- [Skill, tool, qualification, or experience clearly present in the resume and relevant to the job]\n\nSKILL GAPS:\n- [Required or preferred skill, tool, framework, method, or qualification in the job description that is missing from the resume]\n\nEXPERIENCE GAPS:\n- [Experience level, industry background, domain knowledge, leadership, scale, or seniority gap]\n\nMISSING KEYWORDS:\n- [Specific technical keywords, tools, certifications, platforms, or role phrases from the job description that do not appear in the resume]\n\nTRANSFERABLE STRENGTHS:\n- [Relevant strengths from the resume that can help the candidate adapt, even if not an exact match]\n\nOVERALL ASSESSMENT:\n[2-3 sentences summarising the candidate's fit. Clearly state whether this is a strong match, moderate match, stretch match, or weak match.]\n\n---\n\nCANDIDATE RESUME:\n{{ $('Validate Job Input').first().json.resume }}\n\nJOB DESCRIPTION:\n{{ $json.text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are an expert Career Coach and Technical Recruiter with 15 years of experience. Base every judgment only on the provided resume and job description. Do not fabricate skills or experience."
+            }
+          ]
+        }
+      },
+      "id": "26ab612e-a398-49a8-8210-09cd2f11d8b6",
+      "name": "Chain 2 - Gap Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1168,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {
+          "maxOutputTokens": 1100,
+          "temperature": 0.3
+        }
+      },
+      "id": "8b4bf50a-d299-4e2d-8c36-85880b9784d7",
+      "name": "Gemini - Gap Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        240
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "5BpItqFxZTLBh7LS",
+          "name": "Google Gemini(PaLM) Api account 5"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "171f1126-332f-4b56-a7d6-50672d981b50",
+      "name": "Wait 2",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1408,
+        32
+      ],
+      "webhookId": "37bc1cb7-05ae-4ad1-9169-0d7a4375c670"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a clear, actionable, and encouraging learning plan based on the gap analysis below.\n\nReturn your response in EXACTLY this format:\n\nACTION PLAN - PRIORITY SKILLS TO LEARN:\n\nHIGH PRIORITY (Learn these first - they appear most in the job description):\n1. [Skill name]\n   - Why it matters: [1 sentence]\n   - How to learn it: [Specific free resource - course name, YouTube channel, or documentation link]\n   - Estimated time: [e.g., 2 weeks, 1 month]\n\n2. [Repeat for each high-priority skill]\n\nMEDIUM PRIORITY (Important but not blocking):\n1. [Skill name]\n   - Why it matters: [1 sentence]\n   - How to learn it: [Specific resource]\n   - Estimated time: [timeframe]\n\nQUICK WINS (Add to your resume this week):\n- [Things the candidate likely already knows or can add quickly]\n\nRESUME IMPROVEMENT TIPS:\n- [2-3 specific tips to make the resume stronger for this exact role]\n\nENCOURAGEMENT:\n[1-2 sentences of genuine, specific encouragement based on what the candidate already has]\n\n---\n\nGAP ANALYSIS INPUT:\n{{ $json.text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are an expert Career Coach.\n\nYour job is to turn a resume/job gap analysis into a practical learning roadmap.\n\nPrioritize the most important missing skills first.\nRecommend specific free resources where possible.\nKeep the tone encouraging but realistic.\nUse the exact section headings requested by the user."
+            }
+          ]
+        }
+      },
+      "id": "84fb90c3-d594-444b-98be-05607a98d891",
+      "name": "Chain 3 - Action Plan Generator",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        1648,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {
+          "maxOutputTokens": 1300,
+          "temperature": 0.5
+        }
+      },
+      "id": "7cc4f287-4076-4988-b015-d149acd53291",
+      "name": "Gemini - Action Plan",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1648,
+        240
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "5BpItqFxZTLBh7LS",
+          "name": "Google Gemini(PaLM) Api account 5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const validatedInput = $('Validate Job Input').first().json || {};\n\nconst resumeInput = validatedInput.resume || '';\nconst mode = validatedInput.mode || 'url';\nconst rawJobUrl = validatedInput.jobUrl || '';\nconst jobDescription = validatedInput.jobDescription || '';\n\nconst jobUrl =\n  mode === 'paste'\n    ? 'Paste Mode'\n    : rawJobUrl || 'Not provided';\n\nconst jobExtraction =\n  $('Chain 1 - Job Content Extractor').first().json.text || '';\n\nconst gapAnalysis =\n  $('Chain 2 - Gap Analyzer').first().json.text || '';\n\nconst actionPlan =\n  $('Chain 3 - Action Plan Generator').first().json.text || '';\n\nconst jobTitle =\n  jobExtraction.match(/JOB TITLE:\\s*(.+)/i)?.[1]?.trim() ||\n  validatedInput.fallbackJobTitle ||\n  'Unknown Role';\n\nconst company =\n  jobExtraction.match(/COMPANY NAME:\\s*(.+)/i)?.[1]?.trim() ||\n  validatedInput.fallbackCompany ||\n  'Unknown Company';\n\nconst matchScore = parseInt(\n  gapAnalysis.match(/MATCH SCORE:\\s*(\\d+)/i)?.[1] || '0',\n  10\n);\n\nconst fullReport =\n  `CAREER COACH NAVIGATOR REPORT\\n\\n` +\n  `Role: ${jobTitle} at ${company}\\n` +\n  `Match Score: ${matchScore}%\\n` +\n  `Mode: ${mode === 'paste' ? 'Paste Mode' : 'URL Mode'}\\n` +\n  `Generated: ${new Date().toLocaleString()}\\n\\n` +\n  `GAP ANALYSIS\\n\\n${gapAnalysis}\\n\\n` +\n  `ACTION PLAN\\n\\n${actionPlan}`;\n\nreturn [\n  {\n    json: {\n      success: true,\n      metadata: {\n        generatedAt: new Date().toISOString(),\n        jobTitle,\n        company,\n        jobUrl,\n        matchScore: `${matchScore}%`,\n        mode\n      },\n      resumeInput,\n      jobDescription,\n      gapAnalysis,\n      actionPlan,\n      fullReport\n    }\n  }\n];"
+      },
+      "id": "a7aad4b1-813a-4b9c-ab3c-1f1fddc0fc13",
+      "name": "Code Node - Prepare Final Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1888,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1var8ZBQzel6cQQTFkUTWmwc15bEgreVcHjOqMYG2XgE",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Career Coach Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.metadata.generatedAt }}",
+            "Job Title": "={{ $json.metadata.jobTitle }}",
+            "Company": "={{ $json.metadata.company }}",
+            "Match Score": "={{ $json.metadata.matchScore }}",
+            "Full Report": "={{ \"'\" + $json.fullReport.replace(/\\n/g, ' ').replace(/\\r/g, ' ') }}",
+            "Job URL": "={{ $json.metadata.jobUrl }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Job URL",
+              "displayName": "Job URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Match Score",
+              "displayName": "Match Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Full Report",
+              "displayName": "Full Report",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "2f6406c1-9805-4450-82e7-5eaaab075960",
+      "name": "Google Sheets - Append Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2128,
+        32
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Z9qJEPfBX3ZJVTm6",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $('Code Node - Prepare Final Output').first().json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "82820b89-6d04-494f-9af8-af351c8948c9",
+      "name": "Respond to Webhook - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2368,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json || {};\n\nconst resume = String(data.resume || '').trim();\nconst jobUrl = String(data.jobUrl || '').trim();\nconst jobDescription = String(data.jobDescription || '').trim();\nconst mode = data.mode || (jobDescription ? 'paste' : 'url');\n\nconst rawInputContent = String(data.inputContent || '').trim();\n\nconst cleanedInput = rawInputContent\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<noscript[\\s\\S]*?<\\/noscript>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;/gi, ' ')\n  .replace(/&amp;/gi, '&')\n  .replace(/&lt;/gi, '<')\n  .replace(/&gt;/gi, '>')\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nconst makeErrorPayload = (errorType, message) => ({\n  success: false,\n  error: true,\n  errorType,\n  message,\n  metadata: {\n    generatedAt: new Date().toISOString(),\n    jobTitle: 'Unknown Role',\n    company: 'Unknown Company',\n    jobUrl: mode === 'paste' ? 'Paste Mode' : (jobUrl || 'Not provided'),\n    matchScore: '0%',\n    mode\n  },\n  resumeInput: resume,\n  jobDescription,\n  gapAnalysis: '',\n  actionPlan: '',\n  fullReport: message\n});\n\nif (!resume || resume.length < 30) {\n  return [{ json: makeErrorPayload(\n    'MISSING_RESUME',\n    'Please provide a valid resume before running the analysis.'\n  ) }];\n}\n\nif (!cleanedInput || cleanedInput === 'NO CONTENT PROVIDED' || cleanedInput.length < 50) {\n  return [{ json: makeErrorPayload(\n    'MISSING_JOB_DESCRIPTION',\n    mode === 'paste'\n      ? 'Please paste a complete job description.'\n      : 'The job page could not be read. Please paste the job description manually.'\n  ) }];\n}\n\nconst findMatch = (patterns, fallback) => {\n  for (const pattern of patterns) {\n    const match = cleanedInput.match(pattern);\n    if (match?.[1]) {\n      return match[1].replace(/[:|,\\-]+$/g, '').trim().slice(0, 100);\n    }\n  }\n  return fallback;\n};\n\nconst fallbackJobTitle = findMatch(\n  [\n    /job title[:\\s]+(.+?)(?:company|location|department|about|responsibilities|requirements|$)/i,\n    /role[:\\s]+(.+?)(?:company|location|department|about|responsibilities|requirements|$)/i,\n    /position[:\\s]+(.+?)(?:company|location|department|about|responsibilities|requirements|$)/i,\n    /we are hiring (?:a|an)?\\s*(.+?)(?:\\.|,| at | for | to )/i\n  ],\n  'Unknown Role'\n);\n\nconst fallbackCompany = findMatch(\n  [\n    /company[:\\s]+(.+?)(?:role|job title|location|department|about|responsibilities|requirements|$)/i,\n    /about\\s+([A-Z][A-Za-z0-9&.\\- ]{2,50})[:\\s]/i,\n    /at\\s+([A-Z][A-Za-z0-9&.\\- ]{2,50})(?:\\.|,|\\s)/i\n  ],\n  'Unknown Company'\n);\n\nreturn [\n  {\n    json: {\n      ...data,\n      success: true,\n      error: false,\n      resume,\n      jobUrl,\n      jobDescription,\n      mode,\n      inputContent: cleanedInput,\n      fallbackJobTitle,\n      fallbackCompany,\n      inputLength: cleanedInput.length\n    }\n  }\n];"
+      },
+      "id": "8607c430-9e2b-488b-a441-df7aa8caa444",
+      "name": "Validate Job Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-validation-passed",
+              "leftValue": "={{ $json.error }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5f169f80-0a7a-44ab-b3d1-b9117f028967",
+      "name": "IF - Validation Passed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        448,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "ce19eb78-18c7-439e-861c-9cc611a324ab",
+      "name": "Respond to Webhook - Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        480,
+        336
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Frontend Input": {
+      "main": [
+        [
+          {
+            "node": "Set Resume Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Resume Data": {
+      "main": [
+        [
+          {
+            "node": "IF - Has Job Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Has Job Description": {
+      "main": [
+        [
+          {
+            "node": "Prepare Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request - Job Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Job Scraper": {
+      "main": [
+        [
+          {
+            "node": "Prepare Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Input": {
+      "main": [
+        [
+          {
+            "node": "Validate Job Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Job Input": {
+      "main": [
+        [
+          {
+            "node": "IF - Validation Passed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Validation Passed": {
+      "main": [
+        [
+          {
+            "node": "Chain 1 - Job Content Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook - Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Job Extractor": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Chain 1 - Job Content Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chain 1 - Job Content Extractor": {
+      "main": [
+        [
+          {
+            "node": "Wait 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 1": {
+      "main": [
+        [
+          {
+            "node": "Chain 2 - Gap Analyzer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Gap Analyzer": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Chain 2 - Gap Analyzer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chain 2 - Gap Analyzer": {
+      "main": [
+        [
+          {
+            "node": "Wait 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2": {
+      "main": [
+        [
+          {
+            "node": "Chain 3 - Action Plan Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Action Plan": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Chain 3 - Action Plan Generator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chain 3 - Action Plan Generator": {
+      "main": [
+        [
+          {
+            "node": "Code Node - Prepare Final Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Node - Prepare Final Output": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Append Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Append Row": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "edc91485-ee3d-43eb-bfdb-69b16415a766",
+  "meta": {
+    "instanceId": "7966745583d50cb1210cd8041b0817e4ab54c3eaf22487b2c3433d3d07506383"
+  },
+  "id": "FN5floWFyuouBMZVSQ5K-",
+  "tags": [
+    {
+      "updatedAt": "2026-03-31T10:25:14.664Z",
+      "createdAt": "2026-03-31T10:25:14.664Z",
+      "id": "YsuVGAIoDd8NMqQo",
+      "name": "3MTT"
+    },
+    {
+      "updatedAt": "2026-04-25T09:43:29.925Z",
+      "createdAt": "2026-04-25T09:43:29.925Z",
+      "id": "VA6cohtsXWlXLqAX",
+      "name": "Generative AI"
+    },
+    {
+      "updatedAt": "2026-04-25T09:43:29.925Z",
+      "createdAt": "2026-04-25T09:43:29.925Z",
+      "id": "F1M8FRnIptsxTcml",
+      "name": "Cohort 2"
+    }
+  ]
+}
