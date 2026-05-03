@@ -23,6 +23,8 @@ const App = () => {
     setJobMode,
     jobUrl,
     setJobUrl,
+    jobPaste,
+    setJobPaste,
     screen,
     stepStatus,
     report,
@@ -69,6 +71,8 @@ const App = () => {
           onJobModeChange={setJobMode}
           jobUrl={jobUrl}
           onUrlChange={setJobUrl}
+          jobPaste={jobPaste}
+          onPasteChange={setJobPaste}
           onAnalyze={analyze}
           error={error}
           onClearError={() => setError(null)}
