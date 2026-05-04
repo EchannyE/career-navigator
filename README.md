@@ -68,7 +68,7 @@ This workflow is useful for:
 
 | Layer       | URL                                                 |
 | ----------- | --------------------------------------------------- |
-| Frontend    | `https://career-coach-navigator.vercel.app`       |
+| Frontend    | `https://career-navigator-chi.vercel.app/`       |
 | n8n Webhook | `https://your-n8n-instance.cloud/webhook/your-id` |
 
 ---
