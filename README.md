@@ -1,14 +1,16 @@
-# Career Coach Navigator ⚡
+# Career Coach Navigator
 
-An AI-powered career coaching web application that scrapes job listings, compares them against a candidate's resume, and generates a personalised skill gap analysis and learning roadmap using a 3-chain Gemini AI pipeline — all automated through n8n.
+Career Coach Navigator is an AI-powered career coaching application that compares a candidate's resume against a target role and returns a practical match score, gap analysis, and learning roadmap. The user-facing app is built with React and Vite, while the analysis pipeline runs through an n8n workflow powered by Gemini.
 
 ---
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Use Case](#use-case)
 - [Live Demo](#live-demo)
 - [Features](#features)
+- [Visual References](#visual-references)
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
@@ -25,9 +27,9 @@ An AI-powered career coaching web application that scrapes job listings, compare
 
 ## Overview
 
-Career Coach Navigator solves a real problem: job seekers don't know exactly what skills they're missing for a specific role or what to do about it.
+Career Coach Navigator solves a direct job-search problem: candidates often know they are interested in a role, but they do not know how far their current resume is from the job requirements or what to fix first.
 
-A candidate pastes their resume and a job URL into the app. The system:
+A candidate uploads or pastes their resume, then either provides a job URL or pastes the job description directly. The system:
 
 1. Scrapes the job listing page
 2. Extracts the clean job description using AI (Chain 1)
@@ -39,11 +41,34 @@ The backend is a fully automated **n8n workflow** — no Express server, no trad
 
 ---
 
+## Use Case
+
+### Example
+
+A frontend developer wants to apply for a React product-engineer role but is unsure whether their resume reflects the requirements well enough.
+
+They use Career Coach Navigator to:
+
+1. paste their current resume
+2. submit the target job URL or pasted job description
+3. get a role-specific match score and fit summary
+4. identify missing skills, missing keywords, and experience gaps
+5. receive a prioritised action plan for learning and resume updates
+
+This workflow is useful for:
+
+- job seekers tailoring each application to a specific posting
+- career switchers mapping transferable strengths to a new role
+- graduates preparing internship and entry-level applications
+- candidates deciding whether to apply now or close a few gaps first
+
+---
+
 ## Live Demo
 
-| Layer | URL |
-|---|---|
-| Frontend | `https://career-coach-navigator.vercel.app` |
+| Layer       | URL                                                 |
+| ----------- | --------------------------------------------------- |
+| Frontend    | `https://career-coach-navigator.vercel.app`       |
 | n8n Webhook | `https://your-n8n-instance.cloud/webhook/your-id` |
 
 ---
@@ -58,30 +83,49 @@ The backend is a fully automated **n8n workflow** — no Express server, no trad
 - **Action plan** — high/medium priority skills with specific free learning resources and time estimates
 - **Google Sheets logging** — every analysis is appended as a row to a shared spreadsheet
 - **Dark / light mode** — persisted to `localStorage`, toggleable from the header
-- **Report download** — exports the full analysis as a `.txt` file
+- **Report download** — exports the full analysis as a styled `.html` report
 - **Responsive layout** — desktop-first design built with Tailwind CSS
 
 ---
 
+## Visual References
+
+### n8n workflow
+
+The project includes a workflow screenshot in the public assets folder so the pipeline is easy to understand at a glance.
+
+![Career Coach Navigator workflow](frontend/public/img/workflow%20diagram.png)
+
+### Public assets
+
+The frontend ships with these static assets in `frontend/public/`:
+
+- [frontend/public/favicon.svg](frontend/public/favicon.svg) - app favicon used by the Vite frontend
+- [frontend/public/icons.svg](frontend/public/icons.svg) - shared icon sprite used by the UI
+- [frontend/public/img/workflow diagram.png](frontend/public/img/workflow%20diagram.png) - workflow overview image
+- [frontend/public/img/career-coach-report.html](frontend/public/img/career-coach-report.html) - sample exported HTML report
+
 ## Tech Stack
 
 ### Frontend
-| Technology | Purpose |
-|---|---|
-| React 18 | UI framework |
-| Vite | Build tool and dev server |
-| Tailwind CSS v3 | Utility-first styling |
-| Bricolage Grotesque | Display / heading font |
-| DM Sans | Body font |
-| DM Mono | Monospace / code font |
+
+| Technology          | Purpose                   |
+| ------------------- | ------------------------- |
+| React 18            | UI framework              |
+| Vite                | Build tool and dev server |
+| Tailwind CSS v3     | Utility-first styling     |
+| Bricolage Grotesque | Display / heading font    |
+| DM Sans             | Body font                 |
+| DM Mono             | Monospace / code font     |
 
 ### Backend (Automation)
-| Technology | Purpose |
-|---|---|
-| n8n | Workflow automation platform |
+
+| Technology              | Purpose                          |
+| ----------------------- | -------------------------------- |
+| n8n                     | Workflow automation platform     |
 | Google Gemini 2.0 Flash | AI language model (all 3 chains) |
-| Google Sheets API | Report logging |
-| HTTP Request Node | Job page scraping |
+| Google Sheets API       | Report logging                   |
+| HTTP Request Node       | Job page scraping                |
 
 ---
 
@@ -90,7 +134,7 @@ The backend is a fully automated **n8n workflow** — no Express server, no trad
 ```
 [React Frontend]
        │
-       │  POST { resume, jobUrl }
+       │  POST { resume, jobUrl, jobDescription, mode }
        ▼
 [n8n Chat Trigger Webhook]
        │
@@ -122,62 +166,41 @@ The backend is a fully automated **n8n workflow** — no Express server, no trad
 ## Project Structure
 
 ```
-career-coach-navigator/
-│
-├── career-coach-frontend/              # React + Tailwind frontend
-│   ├── index.html
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   ├── postcss.config.js
-│   ├── package.json
-│   ├── .env.example
-│   └── src/
-│       ├── main.jsx                    # React 18 entry point
-│       ├── App.jsx                     # Root — wires hooks to screens
-│       │
-│       ├── constants/
-│       │   └── index.js                # Screens, steps, tabs, score bands, model config
-│       │
-│       ├── styles/
-│       │   └── globals.css             # Tailwind directives + @layer components
-│       │
-│       ├── api/
-│       │   └── coachApi.js             # callClaude(), fetchJobPage(), callN8nWebhook()
-│       │
-│       ├── hooks/
-│       │   ├── useAnalysis.js          # Pipeline logic, form state, chain orchestration
-│       │   └── useDarkMode.js          # Dark/light toggle + localStorage persistence
-│       │
-│       ├── utils/
-│       │   ├── reportParser.js         # Parse raw AI text → clean JS objects
-│       │   └── downloadReport.js       # Browser file download utility
-│       │
-│       └── components/
-│           ├── layout/
-│           │   ├── Layout.jsx          # Full-viewport wrapper
-│           │   └── Header.jsx          # Sticky nav — logo, dark toggle, right slot
-│           │
-│           ├── ui/                     # Reusable primitives (zero business logic)
-│           │   ├── Button.jsx          # Primary and ghost variants
-│           │   ├── Card.jsx            # Surface card with optional accent border
-│           │   ├── Tag.jsx             # Pill badge with dynamic color
-│           │   ├── BulletList.jsx      # Styled bullet point list
-│           │   ├── ScoreRing.jsx       # Animated SVG circular gauge
-│           │   └── SectionLabel.jsx    # Uppercase eyebrow label
-│           │
-│           └── features/              # Screen-level feature components
-│               ├── InputForm/
-│               │   ├── ResumeInput.jsx
-│               │   ├── JobInput.jsx
-│               │   └── InputForm.jsx
-│               ├── Processing/
-│               │   └── ProcessingView.jsx
-│               └── Results/
-│                   ├── OverviewTab.jsx
-│                   ├── TextTabs.jsx    # GapAnalysisTab, ActionPlanTab, FullReportTab
-│                   └── ResultsDashboard.jsx
-│
-└── career-coach-navigator-workflow.json  # n8n workflow — import directly into n8n
+career navigator/
+├── P5 - Career Coach Navigator.json      # n8n workflow export
+├── README.md
+└── frontend/
+       ├── index.html
+       ├── package.json
+       ├── vite.config.js
+       ├── tailwind.config.js
+       ├── postcss.config.js
+       ├── eslint.config.js
+       ├── public/
+       │   ├── favicon.svg
+       │   ├── icons.svg
+       │   └── img/
+       │       ├── workflow diagram.png
+       │       └── career-coach-report.html
+       └── src/
+              ├── App.jsx
+              ├── App.css
+              ├── index.css
+              ├── main.jsx
+              ├── api/
+              │   └── coachApi.js
+              ├── components/
+              │   ├── features/
+              │   ├── layout/
+              │   └── ui/
+              ├── constants/
+              │   └── index.js
+              ├── hooks/
+              │   ├── useAnalysis.js
+              │   └── useDarkMode.js
+              └── utils/
+                     ├── downloadReport.js
+                     └── reportParser.js
 ```
 
 ---
@@ -196,13 +219,13 @@ career-coach-navigator/
 
 ```bash
 git clone https://github.com/your-username/career-coach-navigator.git
-cd career-coach-navigator
+cd "career navigator"
 ```
 
 ### 2. Install frontend dependencies
 
 ```bash
-cd career-coach-frontend
+cd frontend
 npm install
 ```
 
@@ -225,7 +248,7 @@ npm run dev
 
 1. Open your n8n instance
 2. Go to **Workflows → Import from File**
-3. Select `career-coach-navigator-workflow.json`
+3. Select `P5 - Career Coach Navigator.json`
 4. In the workflow, replace the placeholder credential IDs:
    - `REPLACE_WITH_YOUR_GEMINI_CREDENTIAL_ID` (3 Gemini sub-nodes)
    - `REPLACE_WITH_YOUR_SHEETS_CREDENTIAL_ID` (Google Sheets node)
@@ -237,7 +260,7 @@ npm run dev
 
 ## Environment Variables
 
-Create a `.env` file in `career-coach-frontend/` with the following:
+Create a `.env` file in `frontend/` with the following:
 
 ```env
 # ── n8n Webhook ──────────────────────────────────────────────────────────────
@@ -251,29 +274,29 @@ VITE_N8N_WEBHOOK_URL=https://your-n8n-instance.cloud/webhook/your-webhook-id
 
 ## n8n Workflow
 
-The file `career-coach-navigator-workflow.json` contains the complete n8n workflow. Import it directly into n8n — no manual node wiring required.
+The file `P5 - Career Coach Navigator.json` contains the complete n8n workflow. Import it directly into n8n — no manual node wiring required.
 
 ### Nodes
 
-| # | Node | Type | Role |
-|---|---|---|---|
-| 1 | Chat Trigger | `chatTrigger` | Public webhook — receives resume + job URL |
-| 2 | HTTP Request — Job Page Scraper | `httpRequest` | GET request to scrape the job listing HTML |
-| 3 | Chain 1 — Job Content Extractor | `chainLlm` | Strips HTML and extracts structured job info |
-| 4 | Gemini — Job Extractor | `lmChatGoogleGemini` | temp `0.2`, 1024 tokens |
-| 5 | Chain 2 — Gap Analyzer | `chainLlm` | Compares resume vs job, outputs match score |
-| 6 | Gemini — Gap Analyzer | `lmChatGoogleGemini` | temp `0.4`, 1500 tokens |
-| 7 | Chain 3 — Action Plan Generator | `chainLlm` | Builds prioritised learning roadmap |
-| 8 | Gemini — Action Plan | `lmChatGoogleGemini` | temp `0.7`, 2000 tokens |
-| 9 | Code Node — Prepare Final Output | `code` | Assembles structured report JSON |
-| 10 | Google Sheets — Append Row | `googleSheets` | Logs the report to a tracking spreadsheet |
+| #  | Node                              | Type                   | Role                                                                  |
+| -- | --------------------------------- | ---------------------- | --------------------------------------------------------------------- |
+| 1  | Chat Trigger                      | `chatTrigger`        | Public webhook — receives resume, mode, job URL, and pasted job text |
+| 2  | HTTP Request — Job Page Scraper  | `httpRequest`        | GET request to scrape the job listing HTML                            |
+| 3  | Chain 1 — Job Content Extractor  | `chainLlm`           | Strips HTML and extracts structured job info                          |
+| 4  | Gemini — Job Extractor           | `lmChatGoogleGemini` | temp `0.2`, 1024 tokens                                             |
+| 5  | Chain 2 — Gap Analyzer           | `chainLlm`           | Compares resume vs job, outputs match score                           |
+| 6  | Gemini — Gap Analyzer            | `lmChatGoogleGemini` | temp `0.4`, 1500 tokens                                             |
+| 7  | Chain 3 — Action Plan Generator  | `chainLlm`           | Builds prioritised learning roadmap                                   |
+| 8  | Gemini — Action Plan             | `lmChatGoogleGemini` | temp `0.7`, 2000 tokens                                             |
+| 9  | Code Node — Prepare Final Output | `code`               | Assembles structured report JSON                                      |
+| 10 | Google Sheets — Append Row       | `googleSheets`       | Logs the report to a tracking spreadsheet                             |
 
 ### Google Sheets setup
 
 Create a sheet named **Career Coach Log** with these headers in Row 1:
 
-| A | B | C | D | E | F |
-|---|---|---|---|---|---|
+| A         | B         | C       | D       | E           | F           |
+| --------- | --------- | ------- | ------- | ----------- | ----------- |
 | Timestamp | Job Title | Company | Job URL | Match Score | Full Report |
 
 ---
@@ -281,6 +304,7 @@ Create a sheet named **Career Coach Log** with these headers in Row 1:
 ## Frontend Screens
 
 ### Screen 1 — Input
+
 - Hero heading with gradient text
 - Resume textarea with character counter
 - Job URL input with URL/paste toggle
@@ -289,12 +313,14 @@ Create a sheet named **Career Coach Log** with these headers in Row 1:
 - Primary CTA button with glow shadow
 
 ### Screen 2 — Processing
+
 - Animated spinner ring with logo centre
 - Live 4-step chain tracker (Queued / Running / Done)
 - Progress bar filling as each step completes
 - Step labels with colour-coded status badges
 
 ### Screen 3 — Results Dashboard
+
 - Animated SVG score ring (green / amber / red by threshold)
 - Job title, company name, and overall assessment
 - Three stat tiles: Matched · Gaps · Keywords
@@ -312,18 +338,21 @@ Create a sheet named **Career Coach Log** with these headers in Row 1:
 The pipeline uses **prompt chaining** — each chain's output is the next chain's input.
 
 ### Chain 1 — Job Content Extractor
+
 - **Temperature:** `0.2` (low — precise factual extraction)
 - **Max tokens:** `1024`
 - **Input:** Raw HTML from the scraped job page
 - **Output:** Structured text with `JOB TITLE`, `COMPANY NAME`, `JOB DESCRIPTION`
 
 ### Chain 2 — Gap Analyzer
+
 - **Temperature:** `0.4` (medium — analytical and balanced)
 - **Max tokens:** `1500`
 - **Input:** Candidate resume + Chain 1 output
 - **Output:** `MATCH SCORE`, `MATCHED SKILLS`, `SKILL GAPS`, `EXPERIENCE GAPS`, `MISSING KEYWORDS`, `OVERALL ASSESSMENT`
 
 ### Chain 3 — Action Plan Generator
+
 - **Temperature:** `0.7` (higher — creative and motivating)
 - **Max tokens:** `2000`
 - **Input:** Chain 2 output
@@ -335,17 +364,17 @@ The pipeline uses **prompt chaining** — each chain's output is the next chain'
 
 The frontend enforces strict layer separation:
 
-| Layer | File(s) | Responsibility |
-|---|---|---|
-| API | `api/coachApi.js` | All `fetch()` calls — nothing else |
-| Business Logic | `hooks/useAnalysis.js` | Pipeline orchestration, validation, state |
-| Theme | `hooks/useDarkMode.js` | Dark/light toggle + localStorage |
-| Parsing | `utils/reportParser.js` | Extract fields from raw AI text |
-| Download | `utils/downloadReport.js` | File download DOM side-effect |
-| Constants | `constants/index.js` | All magic strings, config values |
-| UI Primitives | `components/ui/` | Rendering only — zero logic |
-| Feature Screens | `components/features/` | Composition only — receive props, render |
-| Root | `App.jsx` | Wires hooks to screens — no logic, no styling |
+| Layer           | File(s)                     | Responsibility                                 |
+| --------------- | --------------------------- | ---------------------------------------------- |
+| API             | `api/coachApi.js`         | All `fetch()` calls — nothing else          |
+| Business Logic  | `hooks/useAnalysis.js`    | Pipeline orchestration, validation, state      |
+| Theme           | `hooks/useDarkMode.js`    | Dark/light toggle + localStorage               |
+| Parsing         | `utils/reportParser.js`   | Extract fields from raw AI text                |
+| Download        | `utils/downloadReport.js` | Styled HTML report export                      |
+| Constants       | `constants/index.js`      | All magic strings, config values               |
+| UI Primitives   | `components/ui/`          | Rendering only — zero logic                   |
+| Feature Screens | `components/features/`    | Composition only — receive props, render      |
+| Root            | `App.jsx`                 | Wires hooks to screens — no logic, no styling |
 
 ---
 
@@ -355,19 +384,19 @@ The frontend enforces strict layer separation:
 
 ```bash
 # Build
-cd career-coach-frontend
+cd frontend
 npm run build
 
 # Deploy via Vercel CLI
 npx vercel --prod
 ```
 
-Or connect the GitHub repository to Vercel and set the root directory to `career-coach-frontend/`. Add `VITE_N8N_WEBHOOK_URL` in the Vercel dashboard under **Settings → Environment Variables**.
+Or connect the GitHub repository to Vercel and set the root directory to `frontend/`. Add `VITE_N8N_WEBHOOK_URL` in the Vercel dashboard under **Settings → Environment Variables**.
 
 ### n8n Workflow → n8n Cloud
 
 1. Go to [n8n.io](https://n8n.io) and create a free cloud account
-2. Create a new workflow and import `career-coach-navigator-workflow.json`
+2. Create a new workflow and import `P5 - Career Coach Navigator.json`
 3. Connect your Google Gemini and Google Sheets credentials
 4. Activate the workflow — n8n will provide a public webhook URL
 5. Add that URL to your Vercel environment as `VITE_N8N_WEBHOOK_URL`
@@ -399,5 +428,3 @@ Please follow the existing file and naming conventions, and keep each file's res
 MIT License — see [LICENSE](./LICENSE) for details.
 
 ---
-
-
