@@ -96,12 +96,21 @@ The project includes a workflow screenshot in the public assets folder so the pi
 
 ![Career Coach Navigator workflow](frontend/public/img/workflow%20diagram.png)
 
+### Postman webhook test
+
+The repository also includes a Postman screenshot showing a sample `POST` request against the n8n webhook and the structured JSON response returned by the workflow.
+
+![Career Coach Navigator Postman test](frontend/public/img/postman.PNG)
+
 ### Public assets
 
 The frontend ships with these static assets in `frontend/public/`:
 
 - [frontend/public/favicon.svg](frontend/public/favicon.svg) - app favicon used by the Vite frontend
 - [frontend/public/icons.svg](frontend/public/icons.svg) - shared icon sprite used by the UI
+- [frontend/public/img/n8n result.PNG](frontend/public/img/n8n%20result.PNG) - n8n execution result screenshot
+- [frontend/public/img/postman.PNG](frontend/public/img/postman.PNG) - Postman request and response screenshot for the webhook
+- [frontend/public/img/Report.jpeg](frontend/public/img/Report.jpeg) - exported report preview image
 - [frontend/public/img/workflow diagram.png](frontend/public/img/workflow%20diagram.png) - workflow overview image
 - [frontend/public/img/career-coach-report.html](frontend/public/img/career-coach-report.html) - sample exported HTML report
 
@@ -180,6 +189,9 @@ career navigator/
        │   ├── favicon.svg
        │   ├── icons.svg
        │   └── img/
+       │       ├── n8n result.PNG
+       │       ├── postman.PNG
+       │       ├── Report.jpeg
        │       ├── workflow diagram.png
        │       └── career-coach-report.html
        └── src/
