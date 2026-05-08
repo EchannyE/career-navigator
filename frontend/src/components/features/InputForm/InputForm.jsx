@@ -40,7 +40,7 @@ const InputForm = ({
     >
       <div className="max-w-xl mb-8 lg:mb-10 animate-fade-up">
         <div className="mb-5">
-          <Tag color="#2563eb">AI-Powered Gap Analysis · 3MTT Cohort 2</Tag>
+          <Tag color="#2563eb">AI-Powered Gap Analysis</Tag>
         </div>
 
         <h1
@@ -102,7 +102,7 @@ const InputForm = ({
         </Button>
 
         <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500">
-          ~30–60 seconds · 3 Gemini chains · Powered by n8n
+          30–60 seconds · 3 Gemini chains · Powered by n8n
         </span>
       </div>
 
